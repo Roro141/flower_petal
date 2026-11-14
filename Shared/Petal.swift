@@ -14,6 +14,14 @@ enum Paper: String, Codable, CaseIterable, Sendable {
         case .newsprint: Color(hex: "#EE8A4E")
         }
     }
+
+    /// Reads a stored `pattern`. Spike rows stored a hex colour instead of a
+    /// paper name; those map to the paper closest to that colour.
+    init(stored: String) {
+        let spikeColours = ["#C8473B": Paper.dots, "#4A6FA5": .gingham, "#9C88B8": .stripe,
+                            "#E2B53E": .ditsy, "#D9793A": .newsprint]
+        self = Paper(rawValue: stored) ?? spikeColours[stored.uppercased()] ?? .dots
+    }
 }
 
 /// One friend's cut petal. `points` is the right half of a single petal,
@@ -96,12 +104,24 @@ extension Petal {
         [[0, 0], [0.2, 0.12], [0.36, 0.34], [0.42, 0.6], [0.37, 0.84], [0.23, 0.95], [0.09, 0.9], [0, 0.78]],
     ]
 
+    /// A sample shape on a random paper, for the spike's "plant a random petal".
+    /// `id` is filled in by Supabase on insert.
+    static func random(owner: String) -> Petal {
+        Petal(
+            id: 0,
+            owner: owner,
+            pattern: Paper.allCases.randomElement() ?? .dots,
+            nPetals: Int.random(in: 5...8),
+            points: sampleShapes.randomElement() ?? sampleShapes[0]
+        )
+    }
+
     /// One sample petal per shape, each on a different paper with a different count.
     /// The owner ids are picked so the five samples get five different centres.
     static let samples: [Petal] = sampleShapes.enumerated().map { index, shape in
         Petal(
             id: -(index + 1),
-            owner: ["sample-0", "sample-2", "sample-3", "sample-5", "sample-7"][index],
+            owner: ["sample-0", "sample-1", "sample-2", "sample-3", "sample-6"][index],
             pattern: Paper.allCases[index % Paper.allCases.count],
             nPetals: [6, 5, 7, 8, 5][index],
             points: shape

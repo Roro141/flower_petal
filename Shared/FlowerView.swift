@@ -179,93 +179,180 @@ struct CentreView: View {
     }
 }
 
-/// A single petal: a teardrop pointing up from the bottom-centre of its rect.
-/// Stand-in for the mirrored half-petal polygon.
-struct PetalShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let base = CGPoint(x: rect.midX, y: rect.maxY)
-        let tip = CGPoint(x: rect.midX, y: rect.minY)
-        path.move(to: base)
-        path.addCurve(
-            to: tip,
-            control1: CGPoint(x: rect.minX - rect.width * 0.2, y: rect.maxY - rect.height * 0.35),
-            control2: CGPoint(x: rect.minX + rect.width * 0.1, y: rect.minY)
-        )
-        path.addCurve(
-            to: base,
-            control1: CGPoint(x: rect.maxX - rect.width * 0.1, y: rect.minY),
-            control2: CGPoint(x: rect.maxX + rect.width * 0.2, y: rect.maxY - rect.height * 0.35)
-        )
-        return path
-    }
+/// The five pot shapes. The sill gives each friend a different one.
+enum PotStyle: CaseIterable {
+    case tapered, tin, bowl, tallSlim, squat
 }
 
-/// A flower in a pot with the friend's name underneath.
-struct PottedFlowerView: View {
-    let flower: Flower
-    var size: CGFloat = 60
+/// A whole plant: the flower head on a paper-strip stem with 1–2 leaves, in a
+/// hand-cut pot with a separate rim strip. `size` is the flower head's width.
+/// The pot's bottom sits on the frame's bottom edge, so plants line up on a sill.
+struct PlantView: View {
+    let petal: Petal
+    let pot: PotStyle
+    let size: CGFloat
+
+    private var height: CGFloat { size * 1.76 }
 
     var body: some View {
-        VStack(spacing: 2) {
-            bloom
-                .frame(width: size, height: size)
-            Rectangle()
-                .fill(Color.ink.opacity(0.7))
-                .frame(width: 2, height: size * 0.35)
-            pot
-            Text(flower.name)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(Color.ink)
-                .lineLimit(1)
+        Canvas { context, canvasSize in
+            drawStemAndPot(in: &context, width: canvasSize.width)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(flower.name)'s flower")
+        .frame(width: size, height: height)
+        .overlay(alignment: .top) {
+            FlowerView(petal: petal, size: size)
+        }
     }
 
-    private var bloom: some View {
-        ZStack {
-            ForEach(0..<flower.petalCount, id: \.self) { index in
-                PetalShape()
-                    .fill(Color(hex: flower.colorHex))
-                    .frame(width: size * 0.3, height: size * 0.5)
-                    .offset(y: -size * 0.25)
-                    // Small per-petal wobble so the repeat is never perfectly symmetric.
-                    .rotationEffect(.degrees(Double(index) * 360 / Double(flower.petalCount) + wobble(index)))
+    /// Stem, leaves, then pot body and rim, each with the same hard shadow as the petals.
+    private func drawStemAndPot(in context: inout GraphicsContext, width: CGFloat) {
+        var random = SeededRandom(petal.owner + "-plant")
+        let shadow = CGSize(width: size * 0.012, height: size * 0.02)
+        func paper(_ path: Path, _ colour: Color) {
+            context.fill(path.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(.ink.opacity(0.22)))
+            context.fill(path, with: .color(colour))
+        }
+        /// Joins points with straight cuts, each nudged a little so no two pots are machine-even.
+        func cut(_ points: [CGPoint]) -> Path {
+            var path = Path()
+            for (index, point) in points.enumerated() {
+                let nudged = CGPoint(x: point.x + (random.next() - 0.5) * size * 0.016,
+                                     y: point.y + (random.next() - 0.5) * size * 0.016)
+                index == 0 ? path.move(to: nudged) : path.addLine(to: nudged)
             }
-            Circle()
-                .fill(Color.ink)
-                .frame(width: size * 0.16, height: size * 0.16)
+            path.closeSubpath()
+            return path
+        }
+
+        let centreX = width / 2
+        let bottom = height
+        let unit = size * 0.38
+        let shape = potShape(unit: unit)
+        let rimHeight = unit * 0.16
+        let bodyTop = bottom - shape.height
+        let rimTop = bodyTop - rimHeight * 0.6
+
+        // Stem: a slightly tapered strip from the flower centre down behind the rim.
+        let stemTop = CGPoint(x: centreX, y: size / 2)
+        let stemBottom = CGPoint(x: centreX + (random.next() - 0.5) * size * 0.08, y: rimTop + rimHeight * 0.3)
+        let stemWidth = size * 0.045
+        paper(cut([
+            CGPoint(x: stemTop.x - stemWidth / 2, y: stemTop.y),
+            CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y),
+            CGPoint(x: stemBottom.x + stemWidth * 0.6, y: stemBottom.y),
+            CGPoint(x: stemBottom.x - stemWidth * 0.6, y: stemBottom.y),
+        ]), .mat)
+
+        // Leaves: the first on a random side, the optional second on the other side, higher up.
+        let leafCount = random.next() < 0.5 ? 1 : 2
+        let firstSide: CGFloat = random.next() < 0.5 ? -1 : 1
+        for index in 0..<leafCount {
+            let along = index == 0 ? 0.62 : 0.4
+            let side = index == 0 ? firstSide : -firstSide
+            let attach = CGPoint(x: stemTop.x + (stemBottom.x - stemTop.x) * along,
+                                 y: stemTop.y + (stemBottom.y - stemTop.y) * along)
+            let length = size * (0.32 + random.next() * 0.08)
+            let angle = side * (50 + random.next() * 20) * .pi / 180
+            let place = CGAffineTransform(rotationAngle: angle)
+                .concatenating(CGAffineTransform(translationX: attach.x, y: attach.y))
+            let leafRect = CGRect(x: -length / 2, y: -length, width: length, height: length)
+            paper(PetalPath(points: Self.leafHalf).path(in: leafRect).applying(place), .mat)
+
+            var crease = Path()
+            crease.move(to: CGPoint(x: 0, y: -length * 0.08))
+            crease.addLine(to: CGPoint(x: 0, y: -length * 0.85))
+            context.stroke(crease.applying(place), with: .color(.cream.opacity(0.3)), lineWidth: max(0.5, size * 0.006))
+        }
+
+        // Pot body.
+        let topHalf = shape.topWidth / 2
+        let bottomHalf = shape.bottomWidth / 2
+        var outline = [CGPoint(x: centreX - topHalf, y: bodyTop)]
+        if pot == .bowl {
+            // Faceted half-ellipse: a round bowl cut with a few straight snips.
+            for step in 1..<7 {
+                let theta = Double.pi - Double(step) / 7 * .pi
+                outline.append(CGPoint(x: centreX + cos(theta) * topHalf, y: bodyTop + sin(theta) * shape.height))
+            }
+        } else {
+            outline.append(CGPoint(x: centreX - bottomHalf, y: bottom))
+            outline.append(CGPoint(x: centreX + bottomHalf, y: bottom))
+        }
+        outline.append(CGPoint(x: centreX + topHalf, y: bodyTop))
+        paper(cut(outline), shape.body)
+
+        if pot == .tin {
+            // Pressed ridges round the tin.
+            for step in 1...3 {
+                let y = bodyTop + shape.height * Double(step) / 4
+                var ridge = Path()
+                ridge.move(to: CGPoint(x: centreX - bottomHalf + size * 0.01, y: y))
+                ridge.addLine(to: CGPoint(x: centreX + bottomHalf - size * 0.01, y: y))
+                context.stroke(ridge, with: .color(.grey.opacity(0.6)), lineWidth: max(0.5, size * 0.01))
+            }
+        }
+
+        // Rim: its own strip, a little wider than the pot mouth and not quite level.
+        let rimHalf = topHalf * 1.08
+        let tilt = (random.next() - 0.5) * rimHeight * 0.4
+        paper(cut([
+            CGPoint(x: centreX - rimHalf, y: rimTop + tilt),
+            CGPoint(x: centreX + rimHalf, y: rimTop - tilt),
+            CGPoint(x: centreX + rimHalf, y: rimTop + rimHeight - tilt),
+            CGPoint(x: centreX - rimHalf, y: rimTop + rimHeight + tilt),
+        ]), shape.rim)
+    }
+
+    /// Widths, height and colours for each pot, in multiples of `unit`.
+    private func potShape(unit: CGFloat) -> (topWidth: CGFloat, bottomWidth: CGFloat, height: CGFloat, body: Color, rim: Color) {
+        switch pot {
+        case .tapered: (unit * 1.5, unit * 1.08, unit, .wood, .sill)
+        case .tin: (unit * 1.25, unit * 1.25, unit * 0.95, .sky, .grey)
+        case .bowl: (unit * 1.6, unit * 1.6, unit * 0.7, .cream, .wood)
+        case .tallSlim: (unit * 0.95, unit * 0.78, unit * 1.35, .sill, .wood)
+        case .squat: (unit * 1.65, unit * 1.45, unit * 0.6, .grey, .cream)
         }
     }
 
-    private var pot: some View {
-        UnevenRoundedRectangle(bottomLeadingRadius: 4, bottomTrailingRadius: 4)
-            .fill(Color.wood)
-            .frame(width: size * 0.55, height: size * 0.4)
-    }
+    /// Half a leaf, in the same format as a petal's points.
+    private static let leafHalf: [[Double]] = [[0, 0], [0.22, 0.18], [0.34, 0.48], [0.24, 0.8], [0, 1]]
+}
 
-    /// Deterministic per-petal jitter (−6°…6°) derived from the flower id and index,
-    /// so it stays stable between app and widget renders.
-    private func wobble(_ index: Int) -> Double {
-        var hash: UInt64 = 1469598103934665603
-        for byte in "\(flower.id)-\(index)".utf8 {
-            hash = (hash ^ UInt64(byte)) &* 1099511628211
-        }
-        return Double(hash % 13) - 6
+extension PotStyle {
+    /// Each place on the sill gets a different pot, left to right.
+    static func forSill(_ index: Int) -> PotStyle {
+        allCases[index % allCases.count]
     }
 }
 
-/// Every friend's flower side by side on one sill.
+/// A friend's name under their pot.
+struct NameLabel: View {
+    let owner: String
+
+    var body: some View {
+        Text(SpikeUsers.name(for: owner))
+            .font(.system(size: 13, design: .monospaced))
+            .foregroundStyle(Color.ink)
+            .lineLimit(1)
+    }
+}
+
+/// Every friend's plant side by side on one sill, drawn live (in the app).
+/// The widget shows the same plants as pre-rendered images instead.
 struct SillView: View {
-    let flowers: [Flower]
-    var flowerSize: CGFloat = 60
+    let petals: [Petal]
+    var plantSize: CGFloat = 80
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 16) {
-                ForEach(flowers) { flower in
-                    PottedFlowerView(flower: flower, size: flowerSize)
+                ForEach(Array(petals.enumerated()), id: \.element.id) { index, petal in
+                    VStack(spacing: 4) {
+                        PlantView(petal: petal, pot: .forSill(index), size: plantSize)
+                        NameLabel(owner: petal.owner)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
                 }
             }
             Rectangle()
@@ -275,14 +362,14 @@ struct SillView: View {
     }
 }
 
-#Preview("Flower") {
-    FlowerView(petal: Petal.samples[0], size: 240)
+#Preview("Plant") {
+    PlantView(petal: Petal.samples[0], pot: .tapered, size: 200)
         .padding()
         .background(Color.wall)
 }
 
-#Preview("Spike sill") {
-    SillView(flowers: FlowerStore.defaultFlowers)
+#Preview("Sill") {
+    SillView(petals: FlowerStore.defaultPetals)
         .padding()
         .background(Color.wall)
 }

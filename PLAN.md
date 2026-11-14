@@ -65,9 +65,9 @@ Steps:
 1. [x] `Petal` model and `PetalPath` (mirror + slight smoothing). Sample screen shows the 5 hard-coded shapes.
 2. [x] Papers: code-drawn fills (table below).
 3. [x] `FlowerView(petal:size:)`: radial repeat, crease, offset shadow, varied centre.
-4. [ ] Stem, 1–2 leaves, and five hand-cut pot shapes with rim strips.
-5. [ ] Supabase: read/write `points`, `pattern`, `n_petals`; the app plants a random sample petal.
-6. [ ] `FlowerRenderer`: PNG per petal id in the App Group; the widget shows the images only.
+4. [x] Stem, 1–2 leaves, and five hand-cut pot shapes with rim strips.
+5. [x] Supabase: read/write `points`, `pattern`, `n_petals`; the app plants a random sample petal.
+6. [x] `FlowerRenderer`: PNG per petal id in the App Group; the widget shows the images only.
 
 | Paper | Colours |
 | --- | --- |

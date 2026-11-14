@@ -91,13 +91,13 @@ struct PaperFill: View {
     }
 }
 
-/// A tiny deterministic random generator (an LCG), so patterns and per-owner
+/// A tiny deterministic random generator (SplitMix64), so patterns and per-owner
 /// choices come out the same on every render and every device.
 struct SeededRandom {
     private var state: UInt64
 
     init(seed: UInt64) {
-        state = seed &* 6364136223846793005 &+ 1442695040888963407
+        state = seed
     }
 
     /// Seeds from a string (e.g. an owner id) with FNV-1a; Swift's own hashing
@@ -112,8 +112,12 @@ struct SeededRandom {
 
     /// The next value in 0..<1.
     mutating func next() -> Double {
-        state = state &* 6364136223846793005 &+ 1442695040888963407
-        return Double(state >> 11) / Double(1 << 53)
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        z ^= z >> 31
+        return Double(z >> 11) / Double(UInt64(1) << 53)
     }
 }
 

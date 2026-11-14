@@ -1,30 +1,13 @@
 import SwiftUI
 
-/// One friend's flower, as stored locally and shown on the sill.
-/// For the spike a flower is just a petal count and a solid colour; the real
-/// version will carry the half-petal polygon and a paper pattern.
-struct Flower: Codable, Hashable, Identifiable, Sendable {
-    let id: String          // profile id
-    var name: String
-    var petalCount: Int     // 5–8
-    var colorHex: String
-
-    static let palette = ["#C8473B", "#4A6FA5", "#9C88B8", "#E2B53E", "#D9793A"]
-
-    static func random(id: String, name: String) -> Flower {
-        Flower(
-            id: id,
-            name: name,
-            petalCount: Int.random(in: 5...8),
-            colorHex: palette.randomElement() ?? "#C8473B"
-        )
-    }
-}
-
 /// The two hard-coded friends for the spike.
 enum SpikeUsers {
     static let names = ["a": "roha", "b": "junie"]
     static let ids = ["a", "b"]
+
+    static func name(for id: String) -> String {
+        names[id] ?? id
+    }
 
     /// Which user this phone is. Set once per device in the app; the widget reads it too.
     static var myID: String {
@@ -33,37 +16,42 @@ enum SpikeUsers {
     }
 }
 
-/// Reads and writes the sill's flowers in the App Group container so the app
+/// Reads and writes the sill's petals in the App Group container so the app
 /// and the widget see the same data.
 enum FlowerStore {
     static let appGroup = "group.com.RohaF.windowsill"
-    private static let fileName = "flowers.json"
+    private static let fileName = "petals.json"
+
+    static var containerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+    }
 
     private static var fileURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appendingPathComponent(fileName)
+        containerURL?.appendingPathComponent(fileName)
     }
 
-    static func load() -> [Flower] {
+    /// The sill's petals, one per friend in `SpikeUsers.ids` order.
+    static func load() -> [Petal] {
         guard let url = fileURL,
               let data = try? Data(contentsOf: url),
-              let flowers = try? JSONDecoder().decode([Flower].self, from: data)
-        else { return defaultFlowers }
-        return flowers
+              let petals = try? JSONDecoder().decode([Petal].self, from: data)
+        else { return defaultPetals }
+        return petals
     }
 
-    static func save(_ flowers: [Flower]) {
+    static func save(_ petals: [Petal]) {
         guard let url = fileURL,
-              let data = try? JSONEncoder().encode(flowers) else { return }
+              let data = try? JSONEncoder().encode(petals) else { return }
         try? data.write(to: url, options: .atomic)
     }
 
-    static var defaultFlowers: [Flower] {
-        [
-            Flower(id: "a", name: SpikeUsers.names["a"] ?? "a", petalCount: 6, colorHex: "#C8473B"),
-            Flower(id: "b", name: SpikeUsers.names["b"] ?? "b", petalCount: 5, colorHex: "#4A6FA5"),
-        ]
+    /// Shown until a friend's first petal arrives.
+    static var defaultPetals: [Petal] {
+        SpikeUsers.ids.enumerated().map { index, id in
+            var petal = Petal.samples[index]
+            petal.owner = id
+            return petal
+        }
     }
 }
 
@@ -84,4 +72,5 @@ extension Color {
     static let wall = Color(hex: "#F1E7D5")
     static let wood = Color(hex: "#C29A6B")
     static let sill = Color(hex: "#B98E62")
+    static let mat = Color(hex: "#3E5747")
 }

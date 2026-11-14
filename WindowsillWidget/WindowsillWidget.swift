@@ -4,58 +4,83 @@ import os
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SillEntry {
-        SillEntry(date: .now, flowers: FlowerStore.defaultFlowers)
+        SillEntry(date: .now, petals: FlowerStore.defaultPetals)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SillEntry) -> ()) {
-        completion(SillEntry(date: .now, flowers: FlowerStore.load()))
+        Task {
+            let petals = FlowerStore.load()
+            await FlowerRenderer.render(petals, onlyMissing: true)
+            completion(SillEntry(date: .now, petals: petals))
+        }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SillEntry>) -> ()) {
         Task {
             // Fetch the latest petals; on failure, show whatever was cached last.
-            let cached = FlowerStore.load()
-            var flowers = cached
+            var petals = FlowerStore.load()
             do {
-                let result = try await PetalService.fetchFlowers(fallback: cached)
-                flowers = result.flowers
-                FlowerStore.save(flowers)
-                logFriendLatency(rows: result.rows)
+                petals = try await PetalService.fetchPetals(fallback: petals)
+                FlowerStore.save(petals)
+                logFriendLatency(petals: petals)
             } catch {
                 PetalService.log.error("widget fetch failed: \(error.localizedDescription, privacy: .public)")
             }
+            // Only new petals need drawing; the view just shows the files.
+            await FlowerRenderer.render(petals, onlyMissing: true)
             // Ask WidgetKit to come back in 15 minutes; pushes can wake it sooner.
             let next = Date.now.addingTimeInterval(15 * 60)
-            completion(Timeline(entries: [SillEntry(date: .now, flowers: flowers)], policy: .after(next)))
+            completion(Timeline(entries: [SillEntry(date: .now, petals: petals)], policy: .after(next)))
         }
     }
 
     /// Spike measurement: the first time the widget sees a new petal from the other
     /// person, log how long after planting it arrived. Console only, never in the UI.
-    private func logFriendLatency(rows: [PetalService.PetalRow]) {
+    private func logFriendLatency(petals: [Petal]) {
         let defaults = UserDefaults(suiteName: FlowerStore.appGroup)
         let friendID = SpikeUsers.ids.first { $0 != SpikeUsers.myID } ?? "b"
-        guard let plantedAt = rows.first(where: { $0.profile_id == friendID })?.created_at else { return }
+        guard let plantedAt = petals.first(where: { $0.owner == friendID })?.createdAt else { return }
 
         let lastSeen = defaults?.object(forKey: "lastSeenFriendPetal") as? Date
         if let lastSeen, plantedAt <= lastSeen { return }
         defaults?.set(plantedAt, forKey: "lastSeenFriendPetal")
 
         let seconds = Date.now.timeIntervalSince(plantedAt)
-        PetalService.log.notice("widget saw friend's petal after \(seconds, format: .fixed(precision: 1), privacy: .public)s")
+        PetalService.log.notice("widget saw friend's petal after \(String(format: "%.1f", seconds), privacy: .public)s")
     }
 }
 
 struct SillEntry: TimelineEntry {
     let date: Date
-    let flowers: [Flower]
+    let petals: [Petal]
 }
 
+/// The sill as static images: each plant is a PNG drawn by `FlowerRenderer`.
 struct WindowsillWidgetEntryView: View {
     var entry: Provider.Entry
 
     var body: some View {
-        SillView(flowers: entry.flowers, flowerSize: 44)
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(Array(entry.petals.enumerated()), id: \.element.id) { index, petal in
+                    VStack(spacing: 2) {
+                        if let image = FlowerRenderer.image(for: petal, sillIndex: index) {
+                            Image(decorative: image, scale: FlowerRenderer.scale)
+                                .resizable()
+                                .scaledToFit()
+                        } else {
+                            Color.clear
+                        }
+                        NameLabel(owner: petal.owner)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
+                }
+            }
+            Rectangle()
+                .fill(Color.sill)
+                .frame(height: 6)
+        }
     }
 }
 
@@ -75,5 +100,5 @@ struct WindowsillWidget: Widget {
 #Preview(as: .systemMedium) {
     WindowsillWidget()
 } timeline: {
-    SillEntry(date: .now, flowers: FlowerStore.defaultFlowers)
+    SillEntry(date: .now, petals: FlowerStore.defaultPetals)
 }

@@ -3,7 +3,7 @@ import WidgetKit
 import os
 
 struct ContentView: View {
-    @State private var flowers = FlowerStore.load()
+    @State private var petals = FlowerStore.load()
     @State private var myID = SpikeUsers.myID
     @State private var isPlanting = false
     @State private var showingSamples = false
@@ -27,7 +27,7 @@ struct ContentView: View {
                 .frame(minHeight: 44)
 
             Spacer()
-            SillView(flowers: flowers, flowerSize: 80)
+            SillView(petals: petals, plantSize: 80)
             Button("plant a random petal", action: plant)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color.cream)
@@ -44,22 +44,16 @@ struct ContentView: View {
         .sheet(isPresented: $showingSamples) { SamplesView() }
     }
 
-    /// Plants a random flower for me: shows it straight away, writes it to Supabase,
-    /// then reloads this phone's widget.
+    /// Plants a random sample petal for me, then shows it here and on this phone's widget.
     private func plant() {
-        let mine = Flower.random(id: myID, name: SpikeUsers.names[myID] ?? myID)
-        if let index = flowers.firstIndex(where: { $0.id == mine.id }) {
-            flowers[index] = mine
-        } else {
-            flowers.append(mine)
-        }
-        FlowerStore.save(flowers)
-        WidgetCenter.shared.reloadAllTimelines()
-
         isPlanting = true
         Task {
             do {
-                try await PetalService.plant(mine)
+                let mine = try await PetalService.plant(Petal.random(owner: myID))
+                if let index = petals.firstIndex(where: { $0.owner == mine.owner }) {
+                    petals[index] = mine
+                }
+                update()
             } catch {
                 PetalService.log.error("plant failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -70,11 +64,18 @@ struct ContentView: View {
     /// Pulls the latest petals so the friend's flower is current when the app opens.
     private func refresh() async {
         do {
-            flowers = try await PetalService.fetchFlowers(fallback: flowers).flowers
-            FlowerStore.save(flowers)
+            petals = try await PetalService.fetchPetals(fallback: petals)
         } catch {
             PetalService.log.error("app fetch failed: \(error.localizedDescription, privacy: .public)")
         }
+        update()
+    }
+
+    /// Saves the sill for the widget, redraws its images, and asks it to reload.
+    private func update() {
+        FlowerStore.save(petals)
+        FlowerRenderer.render(petals, onlyMissing: false)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

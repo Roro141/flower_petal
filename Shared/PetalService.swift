@@ -10,47 +10,54 @@ enum PetalService {
 
     static let log = Logger(subsystem: "windowsill.spike", category: "petals")
 
-    /// A row in `petals_v2` / `latest_petals_v2`.
+    /// A row in `petals_v2` / `latest_petals_v2`. `points` is null on spike rows.
     struct PetalRow: Codable, Sendable {
+        var id: Int?
         let profile_id: String
         let pattern: String
         let n_petals: Int
+        var points: [[Double]]?
         var created_at: Date?
     }
 
     enum ServiceError: Error {
         case badStatus(Int)
+        case emptyResponse
     }
 
-    /// Inserts a new petal for `flower`'s owner.
-    static func plant(_ flower: Flower) async throws {
+    /// Inserts `petal` and returns it as stored, with the id Supabase gave it.
+    static func plant(_ petal: Petal) async throws -> Petal {
         var request = makeRequest(path: "petals_v2")
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
-        let row = PetalRow(profile_id: flower.id, pattern: flower.colorHex, n_petals: flower.petalCount)
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        let row = PetalRow(profile_id: petal.owner, pattern: petal.pattern.rawValue,
+                           n_petals: petal.nPetals, points: petal.points)
         request.httpBody = try JSONEncoder().encode(row)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
         try check(response)
+        guard let stored = try decoder.decode([PetalRow].self, from: data).first else {
+            throw ServiceError.emptyResponse
+        }
+        return Petal(row: stored)
     }
 
-    /// Fetches each person's latest petal and turns them into flowers, in a stable order.
-    /// Anyone who hasn't planted yet keeps their cached (or default) flower.
-    static func fetchFlowers(fallback: [Flower]) async throws -> (flowers: [Flower], rows: [PetalRow]) {
-        let request = makeRequest(path: "latest_petals_v2", query: "select=profile_id,pattern,n_petals,created_at")
+    /// Fetches each person's latest petal, in `SpikeUsers.ids` order.
+    /// Anyone who hasn't planted yet keeps their cached (or default) petal.
+    static func fetchPetals(fallback: [Petal]) async throws -> [Petal] {
+        let request = makeRequest(path: "latest_petals_v2",
+                                  query: "select=id,profile_id,pattern,n_petals,points,created_at")
         let (data, response) = try await URLSession.shared.data(for: request)
         try check(response)
 
         let rows = try decoder.decode([PetalRow].self, from: data)
-        let flowers = SpikeUsers.ids.map { id -> Flower in
+        return SpikeUsers.ids.enumerated().map { index, id in
             if let row = rows.first(where: { $0.profile_id == id }) {
-                return Flower(id: id, name: SpikeUsers.names[id] ?? id, petalCount: row.n_petals, colorHex: row.pattern)
+                return Petal(row: row)
             }
-            return fallback.first(where: { $0.id == id })
-                ?? Flower(id: id, name: SpikeUsers.names[id] ?? id, petalCount: 5, colorHex: "#4A6FA5")
+            return fallback.first(where: { $0.owner == id }) ?? FlowerStore.defaultPetals[index]
         }
-        return (flowers, rows)
     }
 
     // MARK: - Helpers
@@ -84,4 +91,22 @@ enum PetalService {
         }
         return decoder
     }()
+}
+
+extension Petal {
+    /// Builds a petal from a stored row. Spike rows have no points, so they get
+    /// one of the sample shapes, picked from the row id.
+    init(row: PetalService.PetalRow) {
+        let id = row.id ?? 0
+        let points = row.points ?? []
+        let shapes = Petal.sampleShapes
+        self.init(
+            id: id,
+            owner: row.profile_id,
+            pattern: Paper(stored: row.pattern),
+            nPetals: row.n_petals,
+            points: points.count >= 3 ? points : shapes[abs(id) % shapes.count],
+            createdAt: row.created_at
+        )
+    }
 }
