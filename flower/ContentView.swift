@@ -29,19 +29,9 @@ struct ContentView: View {
 
             Spacer()
             SillView(petals: petals, plantSize: 80)
-            Button("plant a random petal") { plant(Petal.random(owner: myID)) }
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.cream)
-                .padding(.horizontal, 20)
-                .frame(minHeight: 44)
-                .background(Color.ink, in: .rect(cornerRadius: 4))
+            TicketButton("plant a random petal") { plant(Petal.random(owner: myID)) }
                 .disabled(isPlanting)
-            Button("cut", action: { isCutting = true })
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.cream)
-                .padding(.horizontal, 20)
-                .frame(minHeight: 44)
-                .background(Color.ink, in: .rect(cornerRadius: 4))
+            TicketButton("cut") { isCutting = true }
             Spacer()
         }
         .padding()

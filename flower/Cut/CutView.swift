@@ -99,14 +99,24 @@ struct CutDrawing {
 /// The cutting screen: a folded sheet of paper on a cutting mat. You cut half a
 /// petal with your finger, starting and ending on the crease (the sheet's left edge).
 struct CutView: View {
-    let paper: Paper
     var onBack: () -> Void
     /// Called with the finished petal when "plant it" is tapped.
     var onPlant: (Petal) -> Void
 
+    /// The paper being cut; picked from the fan.
+    @State private var paper: Paper
+
+    init(paper: Paper, onBack: @escaping () -> Void, onPlant: @escaping (Petal) -> Void) {
+        _paper = State(initialValue: paper)
+        self.onBack = onBack
+        self.onPlant = onPlant
+    }
+
     private static let sheetSize = CGSize(width: 260, height: 360)
     /// The knife cuts this far above the finger, so the finger never hides the line.
     private static let knifeReach: CGFloat = 44
+    /// Cut ⇄ unfold cross-fade; as long as the ticket stub's fall, so it's seen falling.
+    private static let pageTurn = Animation.easeOut(duration: 0.35)
 
     @State private var cut = CutDrawing(size: sheetSize)
     /// Where the knife is while a finger is down, in sheet coordinates.
@@ -127,12 +137,14 @@ struct CutView: View {
                 petal: petal,
                 onRecut: {
                     cut.clear()
-                    unfolding = nil
+                    withAnimation(Self.pageTurn) { unfolding = nil }
                 },
                 onPlant: { onPlant(petal) }
             )
+            .transition(.opacity)
         } else {
             cutting
+                .transition(.opacity)
         }
     }
 
@@ -143,18 +155,24 @@ struct CutView: View {
             HStack {
                 BackArrow(action: onBack)
                 Spacer()
+                PaperFan(selection: $paper)
+                Spacer()
+                // Balances the back arrow so the fan sits in the middle.
+                Color.clear.frame(width: 44, height: 44)
             }
             .padding(.horizontal)
+            .padding(.top, 8)
             Spacer()
             sheet
+            PresetTiles(paper: paper) { unfold($0) }
+                .padding(.top, 24)
             HStack(spacing: 24) {
                 UndoTab(isEnabled: !cut.strokes.isEmpty, onUndo: { cut.undo() }, onClear: { cut.clear() })
                 if let points = cut.petalPoints {
-                    Button("cut") { unfold(points) }
-                        .buttonStyle(InkButtonStyle())
+                    TicketButton("cut") { unfold(points) }
                 }
             }
-            .padding(.top, 28)
+            .padding(.top, 16)
             Spacer()
         }
         .background {
@@ -207,6 +225,8 @@ struct CutView: View {
                 .offset(x: 4, y: 6)
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("folded \(paper.rawValue) paper")
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
@@ -234,13 +254,14 @@ struct CutView: View {
     }
 
     private func unfold(_ points: [[Double]]) {
-        unfolding = Petal(
+        let petal = Petal(
             id: 0,
             owner: SpikeUsers.myID,
             pattern: paper,
             nPetals: Int.random(in: 5...8),
             points: points
         )
+        withAnimation(Self.pageTurn) { unfolding = petal }
     }
 
     /// The knife point for a finger position, kept on the sheet.
@@ -277,6 +298,70 @@ struct CutView: View {
             path.closeSubpath()
         }
         .fill(Color.mat)
+    }
+}
+
+/// The five papers as a small fan of sheets; the chosen one sits raised.
+private struct PaperFan: View {
+    @Binding var selection: Paper
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: -4) {
+            ForEach(Array(Paper.allCases.enumerated()), id: \.element) { index, paper in
+                let isSelected = paper == selection
+                let spread = Double(index - Paper.allCases.count / 2)
+                Button { selection = paper } label: {
+                    PaperFill(paper: paper, scale: 6)
+                        .frame(width: 40, height: 52)
+                        .background {
+                            Rectangle().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
+                        }
+                        .frame(width: 48, height: 60)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .rotationEffect(.degrees(spread * 9), anchor: .bottom)
+                .offset(y: isSelected ? -10 : abs(spread) * 3)
+                .zIndex(isSelected ? 1 : 0)
+                .accessibilityLabel("\(paper.rawValue) paper")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selection)
+    }
+}
+
+/// Four ready-made petals as small cut-paper tiles. Tapping one skips drawing and
+/// goes straight to the unfold, so the flow works without a finger cut (and with VoiceOver).
+private struct PresetTiles: View {
+    let paper: Paper
+    var onPick: ([[Double]]) -> Void
+
+    private static let presets: [(name: String, shape: [[Double]])] = [
+        ("rounded", Petal.sampleShapes[0]),
+        ("pointed", Petal.sampleShapes[1]),
+        ("notched", Petal.sampleShapes[2]),
+        ("heart", Petal.sampleShapes[4]),
+    ]
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(Self.presets, id: \.name) { preset in
+                Button { onPick(preset.shape) } label: {
+                    PaperFill(paper: paper, scale: 5)
+                        .clipShape(PetalPath(points: preset.shape))
+                        .padding(6)
+                        .frame(width: 48, height: 48)
+                        .background {
+                            Rectangle().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
+                            Rectangle().fill(Color.cream)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(preset.name) petal")
+            }
+        }
     }
 }
 

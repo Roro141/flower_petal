@@ -14,7 +14,14 @@ Done (milestone 1, real flowers):
 - Tested on a real iPhone: a petal inserted in Supabase for the other person showed up on the widget without opening the app, about 30 seconds later.
 - Unit tests (Swift Testing) in `WindowsillTests/` cover petal geometry, stored rows, seeded randomness and the PNG renderer.
 
-Not done: cutting, paper textures, accounts, wind, Mac.
+Done (milestone 2, the cutting screen):
+- Cut half a petal with a finger on a folded sheet (knife tip above the finger, loupe, undo tape, dashed ghost when unfinished), or pick one of 4 preset tiles.
+- The cut unfolds into the flower and "plant it" saves it, redraws the widget image and reloads the widget.
+- Ticket buttons for the primary actions.
+
+UI polish is parked on purpose: see [UI-NOTES.md](UI-NOTES.md).
+
+Not done: paper textures, accounts, wind, Mac.
 
 ## Working rules
 
@@ -92,7 +99,7 @@ Done when:
 - Changing a row in Supabase changes the widget flower.
 - The project builds with no warnings about widget memory.
 
-## Milestone 2: the cutting screen
+## Milestone 2: the cutting screen (done)
 
 Goal: the core moment. You draw half a petal from the crease, it unfolds into your flower, and you plant it.
 
@@ -121,8 +128,8 @@ Steps:
 3. [x] Unfinished cut: dashed ghost line to the crease and a 4 pt nudge. Undo tape tab (tap: last stroke, long-press: clear).
 4. [x] Turn the cut into petal points: simplify to 5–12, normalize 0–1 with the base at [0, 0]. Unit tests.
 5. [x] Unfold screen: petals rotate out (≈1 s, 90 ms stagger, ease-out; Reduce Motion fades). "recut" and "plant it" save, re-render and reload the widget.
-6. [ ] Ticket button component, used for "cut", "recut" and "plant it".
-7. [ ] Paper picker fan, 4 preset tiles, VoiceOver pass.
+6. [x] Ticket button component, used for "cut", "recut" and "plant it".
+7. [x] Paper picker fan, 4 preset tiles, VoiceOver pass.
 
 Saving:
 - Simplify the drawn path to 5–12 points.

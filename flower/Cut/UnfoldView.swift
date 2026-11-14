@@ -20,10 +20,8 @@ struct UnfoldView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
             HStack(spacing: 16) {
-                Button("recut", action: onRecut)
-                    .buttonStyle(InkButtonStyle(isPrimary: false))
-                Button("plant it", action: onPlant)
-                    .buttonStyle(InkButtonStyle(isPrimary: true))
+                TicketButton("recut", isPrimary: false, action: onRecut)
+                TicketButton("plant it", action: onPlant)
             }
             Spacer()
         }
@@ -38,21 +36,6 @@ struct UnfoldView: View {
                 isOpen = true
             }
         }
-    }
-}
-
-/// Plain dark buttons for the cut flow. Step 6 replaces these with ticket buttons.
-struct InkButtonStyle: ButtonStyle {
-    var isPrimary = true
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(isPrimary ? Color.cream : Color.ink)
-            .padding(.horizontal, 20)
-            .frame(minHeight: 44)
-            .background(isPrimary ? Color.ink : Color.cream, in: .rect(cornerRadius: 4))
-            .opacity(configuration.isPressed ? 0.8 : 1)
     }
 }
 
