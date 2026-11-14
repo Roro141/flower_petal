@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var flowers = FlowerStore.load()
     @State private var myID = SpikeUsers.myID
     @State private var isPlanting = false
+    @State private var showingSamples = false
 
     var body: some View {
         VStack(spacing: 40) {
@@ -20,6 +21,10 @@ struct ContentView: View {
             .onChange(of: myID) { _, newValue in
                 SpikeUsers.myID = newValue
             }
+
+            // Milestone 1 only: opens the sample petals for checking by eye.
+            Button("samples") { showingSamples = true }
+                .frame(minHeight: 44)
 
             Spacer()
             SillView(flowers: flowers, flowerSize: 80)
@@ -36,6 +41,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.wall)
         .task { await refresh() }
+        .sheet(isPresented: $showingSamples) { SamplesView() }
     }
 
     /// Plants a random flower for me: shows it straight away, writes it to Supabase,

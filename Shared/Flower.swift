@@ -78,6 +78,8 @@ extension Color {
     }
 
     static let ink = Color(hex: "#2B211A")
+    static let grey = Color(hex: "#5A5249")
+    static let sky = Color(hex: "#DCE4E1")
     static let cream = Color(hex: "#FBF6EC")
     static let wall = Color(hex: "#F1E7D5")
     static let wood = Color(hex: "#C29A6B")
