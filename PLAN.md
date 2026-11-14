@@ -8,7 +8,13 @@ Done (milestone 0, the spike):
 - The app inserts a petal. The widget reads the latest petal for each owner and draws a simple solid-colour flower.
 - It has been tested on real iPhones: a row inserted for one person changes the flower on the other person's widget.
 
-Not done: real flower rendering, cutting, paper textures, accounts, wind, Mac.
+Done (milestone 1, real flowers):
+- Petals are mirrored half-polygons on code-drawn papers, repeated around one of five centres, with a stem, leaves and one of five pots.
+- The widget shows the plants as PNGs rendered by `FlowerRenderer`; it never draws them itself.
+- Tested on a real iPhone: a petal inserted in Supabase for the other person showed up on the widget without opening the app, about 30 seconds later.
+- Unit tests (Swift Testing) in `WindowsillTests/` cover petal geometry, stored rows, seeded randomness and the PNG renderer.
+
+Not done: cutting, paper textures, accounts, wind, Mac.
 
 ## Working rules
 
@@ -47,11 +53,12 @@ Shared/                member of BOTH targets
   PetalService.swift   Supabase fetch/insert
 WindowsillWidget/      widget extension
   WindowsillWidget.swift (provider + view), WindowsillWidgetBundle.swift
+WindowsillTests/       unit tests, hosted in the app (run on a simulator)
 ```
 
 Only split or move files when a file gets hard to read.
 
-## Milestone 1: real flowers
+## Milestone 1: real flowers (done)
 
 Goal: the flowers look like the designs: patterned paper petals, mirrored on a fold, repeated around a centre, with a stem and a pot.
 

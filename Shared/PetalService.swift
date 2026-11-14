@@ -78,7 +78,7 @@ enum PetalService {
 
     /// Postgres timestamptz comes back with fractional seconds, which the default
     /// ISO 8601 strategy rejects.
-    private static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let string = try decoder.singleValueContainer().decode(String.self)

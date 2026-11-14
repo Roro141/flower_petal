@@ -39,6 +39,7 @@ Drawn in code for now (scanned textures come in milestone 3): dots, gingham, str
 | `flower/` | iOS app target |
 | `WindowsillWidget/` | widget extension |
 | `Shared/` | code used by both: models, flower drawing, papers, Supabase |
+| `WindowsillTests/` | unit tests (Swift Testing); run with ⌘U on a simulator |
 
 ## How a petal gets to a friend's widget
 
