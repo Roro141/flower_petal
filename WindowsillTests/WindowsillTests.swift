@@ -92,6 +92,101 @@ struct WindowsillTests {
         }
     }
 
+    // MARK: - Cutting
+
+    private let sheet = CGSize(width: 260, height: 360)
+
+    @Test func cutStaysOnTheSheet() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 500, y: -80))
+        cut.touchMoved(to: CGPoint(x: 120, y: 900))
+        for point in cut.strokes.joined() {
+            #expect((0...sheet.width).contains(point.x))
+            #expect((0...sheet.height).contains(point.y))
+        }
+
+        var below = CutDrawing(size: sheet)
+        below.touchDown(at: CGPoint(x: 5, y: 420))   // on the crease line but past the paper
+        #expect(below.strokes.isEmpty)
+    }
+
+    @Test func cutStartSnapsToCreaseAndIgnoresFarTouches() {
+        var far = CutDrawing(size: sheet)
+        far.touchDown(at: CGPoint(x: 100, y: 200))
+        #expect(far.strokes.isEmpty)
+
+        var near = CutDrawing(size: sheet)
+        near.touchDown(at: CGPoint(x: 18, y: 200))
+        #expect(near.strokes.first?.first == CGPoint(x: 0, y: 200))
+    }
+
+    @Test func liftPausesAndNearbyTouchResumes() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 5, y: 300))
+        cut.touchMoved(to: CGPoint(x: 60, y: 250))
+        cut.touchUp(at: CGPoint(x: 60, y: 250))
+        #expect(!cut.isClosed)
+
+        cut.touchDown(at: CGPoint(x: 200, y: 50))   // far from the end: ignored
+        #expect(cut.strokes.count == 1)
+        cut.touchDown(at: CGPoint(x: 70, y: 245))   // near the end: resumes
+        #expect(cut.strokes.count == 2)
+        #expect(cut.strokes[1].first == CGPoint(x: 60, y: 250))
+    }
+
+    @Test func fingerOnTheEndOfAPausedCutResumesIt() {
+        var cut = CutDrawing(size: sheet)
+        let reach: CGFloat = 44
+        // A fresh touch puts the knife straight above the finger.
+        #expect(cut.knifeOffset(forFingerAt: CGPoint(x: 10, y: 300), reach: reach) == CGSize(width: 0, height: -reach))
+
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 80, y: 220))
+        cut.touchUp(at: CGPoint(x: 80, y: 220))
+
+        // Finger lands right on the end of the line: the knife moves onto the end.
+        let finger = CGPoint(x: 84, y: 226)
+        let offset = cut.knifeOffset(forFingerAt: finger, reach: reach)
+        let knife = CGPoint(x: finger.x + offset.width, y: finger.y + offset.height)
+        #expect(knife == CGPoint(x: 80, y: 220))
+        cut.touchDown(at: knife)
+        #expect(cut.strokes.count == 2)
+
+        // Far from the end: back to the usual knife above the finger.
+        #expect(cut.knifeOffset(forFingerAt: CGPoint(x: 200, y: 40), reach: reach) == CGSize(width: 0, height: -reach))
+    }
+
+    @Test func pausingCloseToTheCreaseDoesNotEndTheCut() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 80, y: 200))
+        cut.touchMoved(to: CGPoint(x: 20, y: 120))
+        cut.touchUp(at: CGPoint(x: 20, y: 120))
+        #expect(!cut.isClosed)
+    }
+
+    @Test func cutClosesBackOnTheCrease() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 80, y: 200))
+        cut.touchMoved(to: CGPoint(x: 10, y: 60))
+        cut.touchUp(at: CGPoint(x: 10, y: 60))
+        #expect(cut.isClosed)
+        #expect(cut.lastPoint == CGPoint(x: 0, y: 60))
+
+        cut.touchDown(at: CGPoint(x: 0, y: 60))      // closed: no more cutting
+        #expect(cut.strokes.count == 1)
+    }
+
+    @Test func lingeringNearTheCreaseDoesNotClose() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 15, y: 290))
+        cut.touchUp(at: CGPoint(x: 15, y: 290))
+        #expect(!cut.isClosed)
+    }
+
     private func decodeRows(_ json: String) throws -> [PetalService.PetalRow] {
         try PetalService.decoder.decode([PetalService.PetalRow].self, from: Data(json.utf8))
     }

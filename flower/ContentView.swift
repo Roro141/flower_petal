@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var myID = SpikeUsers.myID
     @State private var isPlanting = false
     @State private var showingSamples = false
+    @State private var isCutting = false
 
     var body: some View {
         VStack(spacing: 40) {
@@ -35,6 +36,12 @@ struct ContentView: View {
                 .frame(minHeight: 44)
                 .background(Color.ink, in: .rect(cornerRadius: 4))
                 .disabled(isPlanting)
+            Button("cut", action: { isCutting = true })
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.cream)
+                .padding(.horizontal, 20)
+                .frame(minHeight: 44)
+                .background(Color.ink, in: .rect(cornerRadius: 4))
             Spacer()
         }
         .padding()
@@ -42,6 +49,9 @@ struct ContentView: View {
         .background(Color.wall)
         .task { await refresh() }
         .sheet(isPresented: $showingSamples) { SamplesView() }
+        .fullScreenCover(isPresented: $isCutting) {
+            CutView(paper: .dots, onBack: { isCutting = false })
+        }
     }
 
     /// Plants a random sample petal for me, then shows it here and on this phone's widget.
