@@ -20,6 +20,9 @@ struct CutDrawing {
 
     var lastPoint: CGPoint? { strokes.last?.last }
 
+    /// Cut started, finger lifted, but not back on the crease yet.
+    var isPaused: Bool { !strokes.isEmpty && !isClosed && !isDrawing }
+
     private var hasLeftCrease: Bool {
         strokes.joined().contains { $0.x >= Self.minimumWidth }
     }
@@ -66,6 +69,20 @@ struct CutDrawing {
         if point.x <= Self.closeDistance, hasLeftCrease { close() }
     }
 
+    /// Takes off the last stroke (and with it, closing the cut if that stroke did).
+    mutating func undo() {
+        guard !strokes.isEmpty else { return }
+        strokes.removeLast()
+        isClosed = false
+        isDrawing = false
+    }
+
+    mutating func clear() {
+        strokes = []
+        isClosed = false
+        isDrawing = false
+    }
+
     private mutating func close() {
         if let last = lastPoint, last.x != 0 {
             strokes[strokes.count - 1].append(CGPoint(x: 0, y: last.y))
@@ -94,6 +111,9 @@ struct CutView: View {
     @State private var tip: CGPoint?
     /// From the finger to the knife for the current touch; set when the finger comes down.
     @State private var knifeOffset = CGSize(width: 0, height: -knifeReach)
+    /// Bumped each time a lift leaves the cut unfinished; drives the sheet's small nudge.
+    @State private var nudges = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var sheetSize: CGSize { Self.sheetSize }
 
@@ -102,15 +122,14 @@ struct CutView: View {
             Ruler()
                 .frame(height: 28)
             HStack {
-                Button("back") { onBack() }
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.cream)
-                    .frame(minWidth: 44, minHeight: 44)
+                BackArrow(action: onBack)
                 Spacer()
             }
             .padding(.horizontal)
             Spacer()
             sheet
+            UndoTab(isEnabled: !cut.strokes.isEmpty, onUndo: { cut.undo() }, onClear: { cut.clear() })
+                .padding(.top, 28)
             Spacer()
         }
         .background {
@@ -136,6 +155,14 @@ struct CutView: View {
             notch
             CutLine(strokes: cut.strokes)
                 .stroke(Color.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            // Unfinished: a faint dashed ghost from the end of the cut back to the crease.
+            if cut.isPaused, let end = cut.lastPoint {
+                Path { path in
+                    path.move(to: end)
+                    path.addLine(to: CGPoint(x: 0, y: end.y))
+                }
+                .stroke(Color.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+            }
         }
         .frame(width: sheetSize.width, height: sheetSize.height)
     }
@@ -169,8 +196,16 @@ struct CutView: View {
                 .onEnded { value in
                     cut.touchUp(at: knifeTip(for: value.location))
                     tip = nil
+                    if cut.isPaused, !reduceMotion { nudges += 1 }
                 }
         )
+        // A small 4 pt nudge towards the crease, then back.
+        .keyframeAnimator(initialValue: CGFloat(0), trigger: nudges) { content, x in
+            content.offset(x: x)
+        } keyframes: { _ in
+            CubicKeyframe(-4, duration: 0.08)
+            SpringKeyframe(0, duration: 0.3)
+        }
     }
 
     /// The knife point for a finger position, kept on the sheet.
@@ -207,6 +242,93 @@ struct CutView: View {
             path.closeSubpath()
         }
         .fill(Color.mat)
+    }
+}
+
+/// Back, as a little hand-cut paper arrow with its own shadow.
+private struct BackArrow: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                ArrowShape().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
+                ArrowShape().fill(Color.cream)
+            }
+            .frame(width: 36, height: 26)
+            .rotationEffect(.degrees(-4))
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("back")
+    }
+}
+
+/// A left-pointing arrow with slightly uneven edges, as if cut with scissors.
+private struct ArrowShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let points: [(CGFloat, CGFloat)] = [
+            (0, 0.5), (0.38, 0.03), (0.37, 0.31), (0.97, 0.27),
+            (1, 0.74), (0.38, 0.69), (0.39, 0.97),
+        ]
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let location = CGPoint(x: rect.minX + point.0 * rect.width, y: rect.minY + point.1 * rect.height)
+            index == 0 ? path.move(to: location) : path.addLine(to: location)
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Undo, as a strip of masking tape: tap takes off the last stroke, long-press clears the cut.
+private struct UndoTab: View {
+    let isEnabled: Bool
+    var onUndo: () -> Void
+    var onClear: () -> Void
+
+    var body: some View {
+        Button(action: onUndo) {
+            Text("undo")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.ink)
+                .padding(.horizontal, 22)
+                .frame(minHeight: 44)
+                .background {
+                    TapeShape().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
+                    TapeShape().fill(Color.wall)
+                }
+        }
+        .buttonStyle(.plain)
+        .rotationEffect(.degrees(-3))
+        .opacity(isEnabled ? 1 : 0.5)
+        .disabled(!isEnabled)
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in onClear() })
+        .accessibilityAction(named: "clear", onClear)
+    }
+}
+
+/// A strip of tape with torn zigzag ends.
+private struct TapeShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let teeth = 5
+        let depth: CGFloat = 4
+        let step = rect.height / CGFloat(teeth)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        for index in 0..<teeth {
+            path.addLine(to: CGPoint(x: rect.maxX - depth, y: rect.minY + step * (CGFloat(index) + 0.5)))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + step * CGFloat(index + 1)))
+        }
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        for index in (0..<teeth).reversed() {
+            path.addLine(to: CGPoint(x: rect.minX + depth, y: rect.minY + step * (CGFloat(index) + 0.5)))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + step * CGFloat(index)))
+        }
+        path.closeSubpath()
+        return path
     }
 }
 

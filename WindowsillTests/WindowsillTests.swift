@@ -166,6 +166,27 @@ struct WindowsillTests {
         #expect(!cut.isClosed)
     }
 
+    @Test func undoTakesOffTheLastStrokeAndClearEmptiesTheCut() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 80, y: 220))
+        cut.touchUp(at: CGPoint(x: 80, y: 220))
+        #expect(cut.isPaused)
+        cut.touchDown(at: CGPoint(x: 80, y: 220))
+        cut.touchMoved(to: CGPoint(x: 0, y: 100))      // crosses the fold: closed
+        #expect(cut.isClosed)
+        #expect(!cut.isPaused)
+
+        cut.undo()
+        #expect(!cut.isClosed)
+        #expect(cut.strokes.count == 1)
+        #expect(cut.lastPoint == CGPoint(x: 80, y: 220))
+
+        cut.clear()
+        #expect(cut.strokes.isEmpty)
+        #expect(!cut.isPaused)
+    }
+
     @Test func cutClosesBackOnTheCrease() {
         var cut = CutDrawing(size: sheet)
         cut.touchDown(at: CGPoint(x: 0, y: 300))
