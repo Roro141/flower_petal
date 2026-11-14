@@ -208,6 +208,59 @@ struct WindowsillTests {
         #expect(!cut.isClosed)
     }
 
+    // MARK: - Cut to petal
+
+    /// A dense, wobbly cut from the crease at y = 300 out and back to it at y = 70.
+    private var wobblyCut: [CGPoint] {
+        (0...120).map { step in
+            let t = Double(step) / 120
+            return CGPoint(x: sin(t * .pi) * 90 + sin(t * 41) * 2, y: 300 - t * 230)
+        }
+    }
+
+    @Test func cutBecomesANormalizedPetal() throws {
+        let points = try #require(CutShape.petalPoints(from: wobblyCut))
+        #expect(CutShape.pointCount.contains(points.count))
+        #expect(points.first == [0, 0])
+        #expect(points.last?.first == 0)
+        for point in points {
+            #expect(point.count == 2)
+            #expect((0...1).contains(point[0]) && (0...1).contains(point[1]))
+        }
+        // The tallest point reaches 1, and the shape isn't stretched sideways.
+        #expect(points.map { $0[1] }.max() == 1)
+        let widest = try #require(points.map { $0[0] }.max())
+        #expect(abs(widest - 90.0 / 230.0) < 0.03)
+    }
+
+    @Test func cutFromTheTipDownGivesTheSamePetal() {
+        #expect(CutShape.petalPoints(from: wobblyCut.reversed()) == CutShape.petalPoints(from: wobblyCut))
+    }
+
+    @Test func plainCutStillGetsFivePoints() throws {
+        let triangle = [CGPoint(x: 0, y: 300), CGPoint(x: 80, y: 200), CGPoint(x: 0, y: 100)]
+        let points = try #require(CutShape.petalPoints(from: triangle))
+        #expect(points.count == 5)
+    }
+
+    @Test func resumedCutRepeatsAreIgnored() throws {
+        let cut = [CGPoint(x: 0, y: 300), CGPoint(x: 60, y: 240), CGPoint(x: 60, y: 240),
+                   CGPoint(x: 90, y: 150), CGPoint(x: 0, y: 80)]
+        let points = try #require(CutShape.petalPoints(from: cut))
+        #expect(Set(points).count == points.count)
+    }
+
+    @Test func onlyAClosedCutHasPetalPoints() {
+        var cut = CutDrawing(size: sheet)
+        cut.touchDown(at: CGPoint(x: 0, y: 300))
+        cut.touchMoved(to: CGPoint(x: 80, y: 200))
+        cut.touchUp(at: CGPoint(x: 80, y: 200))
+        #expect(cut.petalPoints == nil)
+        cut.touchDown(at: CGPoint(x: 80, y: 200))
+        cut.touchMoved(to: CGPoint(x: 0, y: 90))
+        #expect(cut.petalPoints?.first == [0, 0])
+    }
+
     private func decodeRows(_ json: String) throws -> [PetalService.PetalRow] {
         try PetalService.decoder.decode([PetalService.PetalRow].self, from: Data(json.utf8))
     }

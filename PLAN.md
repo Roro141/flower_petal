@@ -119,8 +119,8 @@ Steps:
 1. [x] Cutting screen: mat with grid and ruler, folded sheet with crease and notch, finger cut (snap start to the crease, lift pauses, touch near the end resumes, ends on the crease).
 2. [x] Knife tip 44 pt ahead of the finger, and the loupe.
 3. [x] Unfinished cut: dashed ghost line to the crease and a 4 pt nudge. Undo tape tab (tap: last stroke, long-press: clear).
-4. [ ] Turn the cut into petal points: simplify to 5–12, normalize 0–1 with the base at [0, 0]. Unit tests.
-5. [ ] Unfold screen: petals rotate out (≈1 s, 90 ms stagger, ease-out; Reduce Motion fades). "recut" and "plant it" save, re-render and reload the widget.
+4. [x] Turn the cut into petal points: simplify to 5–12, normalize 0–1 with the base at [0, 0]. Unit tests.
+5. [x] Unfold screen: petals rotate out (≈1 s, 90 ms stagger, ease-out; Reduce Motion fades). "recut" and "plant it" save, re-render and reload the widget.
 6. [ ] Ticket button component, used for "cut", "recut" and "plant it".
 7. [ ] Paper picker fan, 4 preset tiles, VoiceOver pass.
 

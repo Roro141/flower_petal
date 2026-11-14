@@ -29,7 +29,7 @@ struct ContentView: View {
 
             Spacer()
             SillView(petals: petals, plantSize: 80)
-            Button("plant a random petal", action: plant)
+            Button("plant a random petal") { plant(Petal.random(owner: myID)) }
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color.cream)
                 .padding(.horizontal, 20)
@@ -50,19 +50,22 @@ struct ContentView: View {
         .task { await refresh() }
         .sheet(isPresented: $showingSamples) { SamplesView() }
         .fullScreenCover(isPresented: $isCutting) {
-            CutView(paper: .dots, onBack: { isCutting = false })
+            CutView(paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
+                isCutting = false
+                plant(petal)
+            })
         }
     }
 
-    /// Plants a random sample petal for me, then shows it here and on this phone's widget.
-    private func plant() {
+    /// Puts my new petal on the sill straight away, saves it to Supabase, then
+    /// redraws this phone's widget with the saved copy (which has its real id).
+    private func plant(_ petal: Petal) {
+        guard let index = petals.firstIndex(where: { $0.owner == petal.owner }) else { return }
+        petals[index] = petal
         isPlanting = true
         Task {
             do {
-                let mine = try await PetalService.plant(Petal.random(owner: myID))
-                if let index = petals.firstIndex(where: { $0.owner == mine.owner }) {
-                    petals[index] = mine
-                }
+                petals[index] = try await PetalService.plant(petal)
                 update()
             } catch {
                 PetalService.log.error("plant failed: \(error.localizedDescription, privacy: .public)")

@@ -6,6 +6,12 @@ import SwiftUI
 struct FlowerView: View {
     let petal: Petal
     let size: CGFloat
+    /// false: folded, every petal stacked on the first, as it was cut. When this turns
+    /// true the petals rotate out one after another (about 1 s, 90 ms apart, ease-out).
+    /// Widgets and rendered PNGs always pass true, so they never animate.
+    var isOpen = true
+
+    private static let unfoldStagger = 0.09
 
     /// Where each petal sits. Small per-owner jitter in angle and length keeps
     /// the repeat from ever being perfectly even, and stays the same on every render.
@@ -21,21 +27,28 @@ struct FlowerView: View {
 
     var body: some View {
         ZStack {
-            ForEach(Array(placements.enumerated()), id: \.offset) { _, placement in
+            let placements = placements
+            ForEach(Array(placements.enumerated()), id: \.offset) { index, placement in
                 let length = size / 2 * placement.scale
+                let angle = isOpen ? placement.angle : placements[0].angle
                 ZStack {
                     // Hard paper shadow, cast down and to the right in screen space.
                     PetalPath(points: petal.points)
                         .fill(Color.ink.opacity(0.22))
                         .frame(width: length, height: length)
                         .offset(y: -length / 2)
-                        .rotationEffect(.degrees(placement.angle))
+                        .rotationEffect(.degrees(angle))
                         .offset(x: size * 0.012, y: size * 0.02)
                     paperPetal
                         .frame(width: length, height: length)
                         .offset(y: -length / 2)
-                        .rotationEffect(.degrees(placement.angle))
+                        .rotationEffect(.degrees(angle))
                 }
+                .animation(
+                    .timingCurve(0.2, 0.8, 0.2, 1, duration: 1 - Self.unfoldStagger * Double(placements.count - 1))
+                        .delay(Self.unfoldStagger * Double(index)),
+                    value: isOpen
+                )
             }
             CentreView(
                 style: FlowerCentre.for(owner: petal.owner),

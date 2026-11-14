@@ -101,6 +101,8 @@ struct CutDrawing {
 struct CutView: View {
     let paper: Paper
     var onBack: () -> Void
+    /// Called with the finished petal when "plant it" is tapped.
+    var onPlant: (Petal) -> Void
 
     private static let sheetSize = CGSize(width: 260, height: 360)
     /// The knife cuts this far above the finger, so the finger never hides the line.
@@ -114,10 +116,27 @@ struct CutView: View {
     /// Bumped each time a lift leaves the cut unfinished; drives the sheet's small nudge.
     @State private var nudges = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The cut, opened out into a flower, once "cut" is tapped.
+    @State private var unfolding: Petal?
 
     private var sheetSize: CGSize { Self.sheetSize }
 
     var body: some View {
+        if let petal = unfolding {
+            UnfoldView(
+                petal: petal,
+                onRecut: {
+                    cut.clear()
+                    unfolding = nil
+                },
+                onPlant: { onPlant(petal) }
+            )
+        } else {
+            cutting
+        }
+    }
+
+    private var cutting: some View {
         VStack(spacing: 0) {
             Ruler()
                 .frame(height: 28)
@@ -128,8 +147,14 @@ struct CutView: View {
             .padding(.horizontal)
             Spacer()
             sheet
-            UndoTab(isEnabled: !cut.strokes.isEmpty, onUndo: { cut.undo() }, onClear: { cut.clear() })
-                .padding(.top, 28)
+            HStack(spacing: 24) {
+                UndoTab(isEnabled: !cut.strokes.isEmpty, onUndo: { cut.undo() }, onClear: { cut.clear() })
+                if let points = cut.petalPoints {
+                    Button("cut") { unfold(points) }
+                        .buttonStyle(InkButtonStyle())
+                }
+            }
+            .padding(.top, 28)
             Spacer()
         }
         .background {
@@ -206,6 +231,16 @@ struct CutView: View {
             CubicKeyframe(-4, duration: 0.08)
             SpringKeyframe(0, duration: 0.3)
         }
+    }
+
+    private func unfold(_ points: [[Double]]) {
+        unfolding = Petal(
+            id: 0,
+            owner: SpikeUsers.myID,
+            pattern: paper,
+            nPetals: Int.random(in: 5...8),
+            points: points
+        )
     }
 
     /// The knife point for a finger position, kept on the sheet.
@@ -408,5 +443,5 @@ private struct Ruler: View {
 }
 
 #Preview {
-    CutView(paper: .dots, onBack: {})
+    CutView(paper: .dots, onBack: {}, onPlant: { _ in })
 }
