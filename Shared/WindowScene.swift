@@ -7,7 +7,7 @@ import SwiftUI
 /// Used by both the app and the widget, so they always match. `plant` draws one
 /// friend's plant: live in the app, a pre-rendered PNG in the widget.
 struct WindowScene<Plant: View>: View {
-    let petals: [Petal]
+    let sill: Sill
     /// The moment being shown; decides who has wilted (for VoiceOver).
     var now = Date.now
     var boardHeight: CGFloat = 26
@@ -20,17 +20,17 @@ struct WindowScene<Plant: View>: View {
         ZStack(alignment: .bottom) {
             WindowBackdrop(boardHeight: boardHeight)
             HStack(alignment: .bottom, spacing: plantSpacing) {
-                ForEach(Array(petals.enumerated()), id: \.element.id) { index, petal in
+                ForEach(Array(sill.petals.enumerated()), id: \.element.id) { index, petal in
                     VStack(spacing: 0) {
                         plant(index, petal)
                         // The pot stands on the board; the name sits on its front.
-                        NameLabel(owner: petal.owner)
+                        NameLabel(name: sill.name(for: petal.owner))
                             .frame(height: boardHeight)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(petal.isWilted(at: now)
-                        ? "\(SpikeUsers.name(for: petal.owner))'s flower, resting"
-                        : "\(SpikeUsers.name(for: petal.owner))'s flower")
+                        ? "\(sill.name(for: petal.owner))'s flower, resting"
+                        : "\(sill.name(for: petal.owner))'s flower")
                 }
             }
             .padding(.top, plantsTopInset)
@@ -145,7 +145,7 @@ private struct WindowBackdrop: View {
 }
 
 #Preview {
-    WindowScene(petals: FlowerStore.defaultPetals) { index, petal in
+    WindowScene(sill: .preview) { index, petal in
         PlantView(petal: petal, pot: .forSill(index), size: 80)
     }
     .frame(height: 260)

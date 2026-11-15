@@ -1,26 +1,60 @@
 import SwiftUI
 
-/// The two hard-coded friends for the spike.
-enum SpikeUsers {
-    static let names = ["a": "roha", "b": "junie"]
-    static let ids = ["a", "b"]
-
-    static func name(for id: String) -> String {
-        names[id] ?? id
-    }
-
-    /// Which user this phone is. Set once per device in the app; the widget reads it too.
-    static var myID: String {
-        get { UserDefaults(suiteName: FlowerStore.appGroup)?.string(forKey: "myID") ?? "a" }
-        set { UserDefaults(suiteName: FlowerStore.appGroup)?.set(newValue, forKey: "myID") }
-    }
+/// Someone on the windowsill.
+struct Member: Codable, Hashable, Sendable {
+    let id: String
+    var name: String
+    var joinedAt: Date?
 }
 
-/// Reads and writes the sill's petals in the App Group container so the app
-/// and the widget see the same data.
+/// Everything the window shows: who is on this windowsill, in sill order (me
+/// first, then friends in the order they joined), and each person's latest petal,
+/// in the same order.
+struct Sill: Codable, Sendable {
+    var groupID: String
+    var inviteCode: String
+    var myID: String
+    var members: [Member]
+    var petals: [Petal]
+
+    func name(for owner: String) -> String {
+        members.first { $0.id == owner }?.name ?? ""
+    }
+
+    var inviteURL: URL? { URL(string: "windowsill://join/\(inviteCode)") }
+
+    /// Me first, then everyone else in the order they joined.
+    static func sillOrder(_ members: [Member], me: String) -> [Member] {
+        let mine = members.filter { $0.id == me }
+        let others = members.filter { $0.id != me }
+            .sorted { ($0.joinedAt ?? .distantPast) < ($1.joinedAt ?? .distantPast) }
+        return mine + others
+    }
+
+    /// Each member's petal, in sill order. Someone who hasn't cut one yet gets a
+    /// sample shape (unsaved, so it never wilts) until they do.
+    static func petals(for members: [Member], latest: [Petal]) -> [Petal] {
+        members.enumerated().map { index, member in
+            if let petal = latest.first(where: { $0.owner == member.id }) { return petal }
+            let sample = Petal.samples[index % Petal.samples.count]
+            return Petal(id: -(index + 1), owner: member.id, pattern: sample.pattern,
+                         nPetals: sample.nPetals, points: sample.points)
+        }
+    }
+
+    /// Two made-up friends, for previews and the widget gallery.
+    static let preview: Sill = {
+        let members = [Member(id: "a", name: "roha"), Member(id: "b", name: "junie")]
+        return Sill(groupID: "", inviteCode: "", myID: "a", members: members,
+                    petals: petals(for: members, latest: []))
+    }()
+}
+
+/// Keeps the last known sill in the App Group container, so the app opens
+/// straight onto it and the widget can show it without the network.
 enum FlowerStore {
     static let appGroup = "group.com.RohaF.windowsill"
-    private static let fileName = "petals.json"
+    private static let fileName = "sill.json"
 
     static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
@@ -30,28 +64,18 @@ enum FlowerStore {
         containerURL?.appendingPathComponent(fileName)
     }
 
-    /// The sill's petals, one per friend in `SpikeUsers.ids` order.
-    static func load() -> [Petal] {
-        guard let url = fileURL,
-              let data = try? Data(contentsOf: url),
-              let petals = try? JSONDecoder().decode([Petal].self, from: data)
-        else { return defaultPetals }
-        return petals
+    static func load() -> Sill? {
+        guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(Sill.self, from: data)
     }
 
-    static func save(_ petals: [Petal]) {
-        guard let url = fileURL,
-              let data = try? JSONEncoder().encode(petals) else { return }
-        try? data.write(to: url, options: .atomic)
-    }
-
-    /// Shown until a friend's first petal arrives.
-    static var defaultPetals: [Petal] {
-        SpikeUsers.ids.enumerated().map { index, id in
-            var petal = Petal.samples[index]
-            petal.owner = id
-            return petal
+    static func save(_ sill: Sill?) {
+        guard let url = fileURL else { return }
+        guard let sill, let data = try? JSONEncoder().encode(sill) else {
+            try? FileManager.default.removeItem(at: url)
+            return
         }
+        try? data.write(to: url, options: .atomic)
     }
 }
 

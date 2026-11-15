@@ -12,8 +12,21 @@
   },
   "files": [
     { "path": "WindowsillWidgetExtension.entitlements" },
-    { "kind": "folder", "path": "flower", "target-membership": [ "flower" ] },
     {
+      "kind": "folder",
+      "path": "flower",
+      "target-membership": [
+        "flower",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "flower",
+          "exclusions": [
+            "Info.plist",
+          ],
+        },
+      ],
+    }, {
       "kind": "folder",
       "path": "WindowsillWidget",
       "target-membership": [
@@ -75,6 +88,7 @@
         "ENABLE_PREVIEWS": "YES",
         "ENABLE_USER_SELECTED_FILES": "readonly",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "flower/Info.plist",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]": "YES",
         "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]": "YES",

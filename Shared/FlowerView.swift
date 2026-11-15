@@ -376,10 +376,10 @@ extension PotStyle {
 
 /// A friend's name under their pot.
 struct NameLabel: View {
-    let owner: String
+    let name: String
 
     var body: some View {
-        Text(SpikeUsers.name(for: owner))
+        Text(name)
             .font(Fonts.label())
             .foregroundStyle(Color.ink)
             .lineLimit(1)
@@ -389,13 +389,13 @@ struct NameLabel: View {
 /// Every friend's plant in the window, drawn live (in the app).
 /// The widget shows the same window with the plants as pre-rendered images.
 struct SillView: View {
-    let petals: [Petal]
+    let sill: Sill
     var plantSize: CGFloat = 80
     /// The moment being shown; decides who has wilted.
     var now = Date.now
 
     var body: some View {
-        WindowScene(petals: petals, now: now) { index, petal in
+        WindowScene(sill: sill, now: now) { index, petal in
             PlantView(petal: petal, pot: .forSill(index), size: plantSize, isWilted: petal.isWilted(at: now))
         }
         // Room for the plants plus some window above them.
@@ -419,7 +419,7 @@ struct SillView: View {
 }
 
 #Preview("Sill") {
-    SillView(petals: FlowerStore.defaultPetals)
+    SillView(sill: .preview)
         .padding()
         .background(Color.wall)
 }

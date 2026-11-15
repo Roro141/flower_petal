@@ -18,7 +18,7 @@ struct UnfoldView: View {
             FlowerView(petal: petal, size: 260, isOpen: isOpen || reduceMotion)
                 .opacity(isShown || !reduceMotion ? 1 : 0)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
+                .accessibilityLabel("your flower")
             HStack(spacing: 16) {
                 TicketButton("recut", isPrimary: false, action: onRecut)
                 TicketButton("plant it", action: onPlant)

@@ -62,12 +62,35 @@ struct WindowsillTests {
         #expect(Petal.sampleShapes.contains(petal.points))
     }
 
-    @Test func insertRowLeavesOutServerColumns() throws {
-        let row = PetalService.PetalRow(profile_id: "a", pattern: "dots", n_petals: 6, points: [[0, 0], [0.3, 0.5], [0, 1]])
+    @Test func newPetalLeavesOwnerIdAndTimeToTheServer() throws {
+        let row = PetalService.NewPetal(group_id: "g", points: [[0, 0], [0.3, 0.5], [0, 1]], pattern: "dots", n_petals: 6)
         let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
         #expect(object?["id"] == nil)
+        #expect(object?["profile_id"] == nil)
         #expect(object?["created_at"] == nil)
+        #expect(object?["group_id"] as? String == "g")
         #expect(object?["pattern"] as? String == "dots")
+    }
+
+    @Test func sillPutsMeFirstThenFriendsInJoinOrder() {
+        let start = Date(timeIntervalSince1970: 0)
+        let members = [
+            Member(id: "c", name: "cleo", joinedAt: start.addingTimeInterval(30)),
+            Member(id: "me", name: "roha", joinedAt: start.addingTimeInterval(20)),
+            Member(id: "a", name: "ada", joinedAt: start),
+        ]
+        #expect(Sill.sillOrder(members, me: "me").map(\.id) == ["me", "a", "c"])
+    }
+
+    @Test func membersWithoutAPetalGetUniquePlaceholders() {
+        let members = (0..<6).map { Member(id: "m\($0)", name: "m\($0)") }
+        // Saved petals always have positive ids from the server.
+        let planted = Petal(id: 42, owner: "m2", pattern: .dots, nPetals: 6, points: Petal.sampleShapes[0],
+                            createdAt: .now)
+        let petals = Sill.petals(for: members, latest: [planted])
+        #expect(petals.map(\.owner) == members.map(\.id))
+        #expect(Set(petals.map(\.id)).count == 6)
+        #expect(petals.filter { $0.owner != "m2" }.allSatisfy { $0.createdAt == nil })
     }
 
     @Test func seededRandomRepeatsPerOwnerAndDiffersBetweenOwners() {
@@ -107,7 +130,7 @@ struct WindowsillTests {
     @MainActor
     @Test func rendererWritesAndReloadsPlantImages() throws {
         try #require(FlowerStore.containerURL != nil, "App Group container is missing")
-        let petals = FlowerStore.defaultPetals
+        let petals = Sill.preview.petals
         FlowerRenderer.render(petals, onlyMissing: false)
         for (index, petal) in petals.enumerated() {
             for wilted in [false, true] {

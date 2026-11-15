@@ -99,6 +99,8 @@ struct CutDrawing {
 /// The cutting screen: a folded sheet of paper on a cutting mat. You cut half a
 /// petal with your finger, starting and ending on the crease (the sheet's left edge).
 struct CutView: View {
+    /// Whose petal this is (the signed-in person).
+    let owner: String
     var onBack: () -> Void
     /// Called with the finished petal when "plant it" is tapped.
     var onPlant: (Petal) -> Void
@@ -106,7 +108,8 @@ struct CutView: View {
     /// The paper being cut; picked from the fan.
     @State private var paper: Paper
 
-    init(paper: Paper, onBack: @escaping () -> Void, onPlant: @escaping (Petal) -> Void) {
+    init(owner: String, paper: Paper, onBack: @escaping () -> Void, onPlant: @escaping (Petal) -> Void) {
+        self.owner = owner
         _paper = State(initialValue: paper)
         self.onBack = onBack
         self.onPlant = onPlant
@@ -257,7 +260,7 @@ struct CutView: View {
     private func unfold(_ points: [[Double]]) {
         let petal = Petal(
             id: 0,
-            owner: SpikeUsers.myID,
+            owner: owner,
             pattern: paper,
             nPetals: Int.random(in: 5...8),
             points: points
@@ -529,5 +532,5 @@ private struct Ruler: View {
 }
 
 #Preview {
-    CutView(paper: .dots, onBack: {}, onPlant: { _ in })
+    CutView(owner: "a", paper: .dots, onBack: {}, onPlant: { _ in })
 }

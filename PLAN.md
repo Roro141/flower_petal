@@ -185,6 +185,17 @@ Done when side by side with the mockups on the Windowsill canvas, it reads as pa
 - Row-level security: replace the open test policies so members can only read and insert within their own groups.
 - The widget sill shows your group, with you first and the others in the order they joined.
 
+Decisions: paid Apple Developer account (Sign in with Apple is fine). No domain yet, so invites use the app link `windowsill://join/<code>` for now.
+
+Steps:
+1. [x] SQL migration (`supabase/migrations/`): profiles, groups (with invite code), members, a new `petals` table and `latest_petals` view, row-level security, and `create_group` / `join_group` functions. Run by hand in the SQL Editor.
+2. [x] Sign in with Apple → Supabase session, stored in the shared keychain so the widget can use it too; refreshed when it expires.
+3. [x] Name, start a windowsill, invite link, join from a link.
+4. [x] Sill from the group: me first, then friends in the order they joined; names from profiles. Widget too. Spike users removed.
+5. [ ] Close the spike table: drop the open test policies on `petals_v2` (second SQL file, run after the new app works).
+
+Setup (by hand, once): run `001_accounts_groups.sql` in the SQL Editor; in Authentication → Sign In / Providers → Apple, turn Apple on and add `com.RohaF.windowsill` under Client IDs.
+
 Done when two fresh accounts can join one group through a link, each sees only that group's petals, and the open policies are gone.
 
 ## Milestone 5: faster updates (widget push)
@@ -197,7 +208,7 @@ Done when a new petal usually shows on a friend's widget within a minute or two.
 
 ## Milestone 6: wind
 
-- Trigger: a server-side event per group. The owner hasn't decided whether it fires at random a few times a day or when a friend cuts a new petal, so ask before building the trigger.
+- Trigger: a server-side event per group, at random a few times a day (decided). Needs a scheduled job in Supabase.
 - In the app (garden screen):
   - Flowers lean right 10–22° each, staggered 40 ms from left to right.
   - Lean in 0.45 s ease-out, hold 0.45 s, then spring back (response 0.9, damping 0.55).
