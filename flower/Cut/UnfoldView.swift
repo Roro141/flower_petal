@@ -27,6 +27,7 @@ struct UnfoldView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.wall)
+        .overlay { PaperGrain().ignoresSafeArea() }
         .task {
             if reduceMotion {
                 withAnimation(.easeOut(duration: 0.4)) { isShown = true }

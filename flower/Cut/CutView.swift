@@ -196,6 +196,7 @@ struct CutView: View {
                 .fill(Color.ink.opacity(0.25))
                 .frame(width: 1.5)
             notch
+            PaperGrain()
             CutLine(strokes: cut.strokes)
                 .stroke(Color.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
             // Unfinished: a faint dashed ghost from the end of the cut back to the crease.

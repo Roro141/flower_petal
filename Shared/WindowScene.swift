@@ -30,6 +30,7 @@ struct WindowScene<Plant: View>: View {
                 }
             }
             .padding(.top, plantsTopInset)
+            PaperGrain()
         }
     }
 }
@@ -56,7 +57,8 @@ private struct WindowBackdrop: View {
 
             /// A paper piece with a hard shadow; `lift` is how far it sits off what's behind.
             func piece(_ path: Path, _ colour: Color, lift: CGFloat = 1) {
-                context.fill(path.offsetBy(dx: 1.5 * lift, dy: 2.5 * lift), with: .color(.ink.opacity(0.2)))
+                let shadow = PaperShadow.offset(lift: lift, unit: 2.5)
+                context.fill(path.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(PaperShadow.colour(lift: lift)))
                 context.fill(path, with: .color(colour))
             }
 

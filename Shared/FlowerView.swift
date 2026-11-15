@@ -31,14 +31,17 @@ struct FlowerView: View {
             ForEach(Array(placements.enumerated()), id: \.offset) { index, placement in
                 let length = size / 2 * placement.scale
                 let angle = isOpen ? placement.angle : placements[0].angle
+                // Each petal is laid on top of the one before, so sits a little higher.
+                let lift = 1.1 + 0.07 * CGFloat(index)
+                let shadow = PaperShadow.offset(lift: lift, unit: size * 0.02)
                 ZStack {
                     // Hard paper shadow, cast down and to the right in screen space.
                     PetalPath(points: petal.points)
-                        .fill(Color.ink.opacity(0.22))
+                        .fill(PaperShadow.colour(lift: lift))
                         .frame(width: length, height: length)
                         .offset(y: -length / 2)
                         .rotationEffect(.degrees(angle))
-                        .offset(x: size * 0.012, y: size * 0.02)
+                        .offset(x: shadow.width, y: shadow.height)
                     paperPetal
                         .frame(width: length, height: length)
                         .offset(y: -length / 2)
@@ -104,7 +107,9 @@ struct CentreView: View {
             context.translateBy(x: size.width / 2, y: size.height / 2)
             let outline = outlinePath(radius: radius)
                 .applying(CGAffineTransform(rotationAngle: turn * .pi / 180))
-            context.fill(outline.offsetBy(dx: radius * 0.08, dy: radius * 0.12), with: .color(.ink.opacity(0.22)))
+            // The centre is glued on last, so it sits highest.
+            let shadow = PaperShadow.offset(lift: 1.7, unit: radius * 0.2)
+            context.fill(outline.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(PaperShadow.colour(lift: 1.7)))
             context.fill(outline, with: .color(fill))
             context.rotate(by: .degrees(turn))
             drawDetails(in: &context, radius: radius)
@@ -217,12 +222,12 @@ struct PlantView: View {
         }
     }
 
-    /// Stem, leaves, then pot body and rim, each with the same hard shadow as the petals.
+    /// Stem, leaves, then pot body and rim, each with a hard shadow set by how high it sits.
     private func drawStemAndPot(in context: inout GraphicsContext, width: CGFloat) {
         var random = SeededRandom(petal.owner + "-plant")
-        let shadow = CGSize(width: size * 0.012, height: size * 0.02)
-        func paper(_ path: Path, _ colour: Color) {
-            context.fill(path.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(.ink.opacity(0.22)))
+        func paper(_ path: Path, _ colour: Color, lift: CGFloat) {
+            let shadow = PaperShadow.offset(lift: lift, unit: size * 0.02)
+            context.fill(path.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(PaperShadow.colour(lift: lift)))
             context.fill(path, with: .color(colour))
         }
         /// Joins points with straight cuts, each nudged a little so no two pots are machine-even.
@@ -253,7 +258,7 @@ struct PlantView: View {
             CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y),
             CGPoint(x: stemBottom.x + stemWidth * 0.6, y: stemBottom.y),
             CGPoint(x: stemBottom.x - stemWidth * 0.6, y: stemBottom.y),
-        ]), .mat)
+        ]), .mat, lift: 0.7)
 
         // Leaves: the first on a random side, the optional second on the other side, higher up.
         let leafCount = random.next() < 0.5 ? 1 : 2
@@ -268,7 +273,7 @@ struct PlantView: View {
             let place = CGAffineTransform(rotationAngle: angle)
                 .concatenating(CGAffineTransform(translationX: attach.x, y: attach.y))
             let leafRect = CGRect(x: -length / 2, y: -length, width: length, height: length)
-            paper(PetalPath(points: Self.leafHalf).path(in: leafRect).applying(place), .mat)
+            paper(PetalPath(points: Self.leafHalf).path(in: leafRect).applying(place), .mat, lift: 0.9)
 
             var crease = Path()
             crease.move(to: CGPoint(x: 0, y: -length * 0.08))
@@ -291,7 +296,7 @@ struct PlantView: View {
             outline.append(CGPoint(x: centreX + bottomHalf, y: bottom))
         }
         outline.append(CGPoint(x: centreX + topHalf, y: bodyTop))
-        paper(cut(outline), shape.body)
+        paper(cut(outline), shape.body, lift: 1)
 
         if pot == .tin {
             // Pressed ridges round the tin.
@@ -312,7 +317,7 @@ struct PlantView: View {
             CGPoint(x: centreX + rimHalf, y: rimTop - tilt),
             CGPoint(x: centreX + rimHalf, y: rimTop + rimHeight - tilt),
             CGPoint(x: centreX - rimHalf, y: rimTop + rimHeight + tilt),
-        ]), shape.rim)
+        ]), shape.rim, lift: 1.3)
     }
 
     /// Widths, height and colours for each pot, in multiples of `unit`.
