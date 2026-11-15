@@ -396,7 +396,8 @@ struct SillView: View {
 
     var body: some View {
         WindowScene(sill: sill, now: now) { index, petal in
-            PlantView(petal: petal, pot: .forSill(index), size: plantSize, isWilted: petal.isWilted(at: now))
+            PlantView(petal: petal, pot: .forSill(sill.joinRank(of: petal.owner)), size: plantSize,
+                      isWilted: petal.isWilted(at: now))
         }
         // Room for the plants plus some window above them.
         .frame(height: plantSize * 2.6 + 26)

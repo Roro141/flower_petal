@@ -146,7 +146,7 @@ private struct WindowBackdrop: View {
 
 #Preview {
     WindowScene(sill: .preview) { index, petal in
-        PlantView(petal: petal, pot: .forSill(index), size: 80)
+        PlantView(petal: petal, pot: .forSill(index), size: 80)  // preview only
     }
     .frame(height: 260)
 }

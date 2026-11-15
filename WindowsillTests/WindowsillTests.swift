@@ -82,6 +82,24 @@ struct WindowsillTests {
         #expect(Sill.sillOrder(members, me: "me").map(\.id) == ["me", "a", "c"])
     }
 
+    @Test func placeholdersAndPotsGoByJoinOrderSoEveryPhoneAgrees() {
+        let start = Date(timeIntervalSince1970: 0)
+        let members = (0..<4).map { Member(id: "m\($0)", name: "m\($0)", joinedAt: start.addingTimeInterval(Double($0))) }
+        // Two phones: each puts its own person first.
+        let onPhone1 = Sill(groupID: "", inviteCode: "", myID: "m2", members: Sill.sillOrder(members, me: "m2"), petals: [])
+        let onPhone2 = Sill(groupID: "", inviteCode: "", myID: "m0", members: Sill.sillOrder(members, me: "m0"), petals: [])
+        let petals1 = Sill.petals(for: onPhone1.members, latest: [])
+        let petals2 = Sill.petals(for: onPhone2.members, latest: [])
+        for member in members {
+            let a = petals1.first { $0.owner == member.id }
+            let b = petals2.first { $0.owner == member.id }
+            #expect(a?.pattern == b?.pattern && a?.points == b?.points)
+            #expect(onPhone1.joinRank(of: member.id) == onPhone2.joinRank(of: member.id))
+        }
+        // Different people get different placeholders (up to five).
+        #expect(Set(petals1.map(\.pattern)).count == 4)
+    }
+
     @Test func membersWithoutAPetalGetUniquePlaceholders() {
         let members = (0..<6).map { Member(id: "m\($0)", name: "m\($0)") }
         // Saved petals always have positive ids from the server.
@@ -130,11 +148,11 @@ struct WindowsillTests {
     @MainActor
     @Test func rendererWritesAndReloadsPlantImages() throws {
         try #require(FlowerStore.containerURL != nil, "App Group container is missing")
-        let petals = Sill.preview.petals
-        FlowerRenderer.render(petals, onlyMissing: false)
-        for (index, petal) in petals.enumerated() {
+        let sill = Sill.preview
+        FlowerRenderer.render(sill, onlyMissing: false)
+        for petal in sill.petals {
             for wilted in [false, true] {
-                let image = try #require(FlowerRenderer.image(for: petal, sillIndex: index, wilted: wilted))
+                let image = try #require(FlowerRenderer.image(for: petal, in: sill, wilted: wilted))
                 #expect(image.width == Int(FlowerRenderer.plantSize * FlowerRenderer.scale))
             }
         }

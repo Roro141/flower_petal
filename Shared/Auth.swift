@@ -26,6 +26,15 @@ enum Auth {
         return session
     }
 
+    /// TEMPORARY, for testing while Sign in with Apple isn't working yet: a Supabase
+    /// anonymous account (needs "Allow anonymous sign-ins" on in the dashboard).
+    /// Remove before real use.
+    static func signInAnonymously() async throws -> Session {
+        let session = try await post(path: "auth/v1/signup", query: nil, body: [:])
+        SessionKeychain.save(session)
+        return session
+    }
+
     /// The saved session, refreshed first if it expires within a minute.
     /// nil when nobody is signed in on this phone.
     static func currentSession() async throws -> Session? {
@@ -57,9 +66,13 @@ enum Auth {
     }
 
     private static func token(grant: String, body: [String: String]) async throws -> Session {
-        var components = URLComponents(url: PetalService.projectURL.appending(path: "auth/v1/token"),
+        try await post(path: "auth/v1/token", query: [URLQueryItem(name: "grant_type", value: grant)], body: body)
+    }
+
+    private static func post(path: String, query: [URLQueryItem]?, body: [String: String]) async throws -> Session {
+        var components = URLComponents(url: PetalService.projectURL.appending(path: path),
                                        resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "grant_type", value: grant)]
+        components?.queryItems = query
         var request = URLRequest(url: components?.url ?? PetalService.projectURL)
         request.httpMethod = "POST"
         request.setValue(PetalService.publishableKey, forHTTPHeaderField: "apikey")
@@ -68,7 +81,8 @@ enum Auth {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            PetalService.log.error("auth \(grant, privacy: .public) failed: \(http.statusCode)")
+            let message = String(data: data, encoding: .utf8) ?? ""
+            PetalService.log.error("auth \(path, privacy: .public) failed: \(http.statusCode) \(message, privacy: .public)")
             throw AuthError.badStatus(http.statusCode)
         }
         let reply = try JSONDecoder().decode(TokenResponse.self, from: data)

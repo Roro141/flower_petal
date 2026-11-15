@@ -93,8 +93,9 @@ enum PetalService {
             session: session
         )
         let rows: [MemberRow] = try await send(memberRequest)
-        // The windowsill I joined first (there's only one for now).
-        guard let mine = rows.first(where: { $0.profile_id == session.userID }),
+        // The windowsill I joined most recently, so opening a friend's invite takes me
+        // to theirs even if I'd already started my own. (rows are oldest first.)
+        guard let mine = rows.last(where: { $0.profile_id == session.userID }),
               let inviteCode = mine.groups?.invite_code else { return nil }
 
         let members = rows

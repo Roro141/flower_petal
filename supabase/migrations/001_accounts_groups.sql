@@ -1,26 +1,38 @@
 -- Windowsill: accounts, groups and invites.
--- Run once in the Supabase dashboard: SQL Editor → New query → paste → Run.
--- Leaves the spike table (petals_v2) alone; 002_close_spike.sql locks that later.
+-- Run in the Supabase dashboard: SQL Editor → New query → paste → Run.
+-- Safe to run again. Leaves the spike table (petals_v2) alone; 002_close_spike.sql locks that later.
 
 create extension if not exists pgcrypto;
+
+-- An older test table called "petals" (from before petals_v2) may already exist.
+-- Keep it, renamed to petals_v1, so the new petals table can take the name.
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'petals')
+     and not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'petals'
+                       and column_name = 'group_id' and data_type = 'uuid') then
+    alter table public.petals rename to petals_v1;
+  end if;
+end $$;
 
 -- ── Tables ────────────────────────────────────────────────────────────────
 
 -- One row per person, keyed by their auth user id.
-create table public.profiles (
+create table if not exists public.profiles (
   id   uuid primary key references auth.users (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 24)
 );
 
 -- A windowsill. The invite code goes in the link: windowsill://join/<invite_code>.
-create table public.groups (
+create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
   invite_code text not null unique default encode(gen_random_bytes(6), 'hex'),
   created_at  timestamptz not null default now()
 );
 
 -- Who is on which windowsill (2–6 people), and in what order they joined.
-create table public.members (
+create table if not exists public.members (
   group_id   uuid not null references public.groups (id) on delete cascade,
   profile_id uuid not null references public.profiles (id) on delete cascade,
   joined_at  timestamptz not null default now(),
@@ -28,7 +40,7 @@ create table public.members (
 );
 
 -- Cut petals. points = the right half of one petal, [[x, y], ...], normalized 0–1.
-create table public.petals (
+create table if not exists public.petals (
   id         bigint generated always as identity primary key,
   profile_id uuid not null default auth.uid() references public.profiles (id) on delete cascade,
   group_id   uuid not null references public.groups (id) on delete cascade,
@@ -37,22 +49,22 @@ create table public.petals (
   n_petals   int not null check (n_petals between 5 and 8),
   created_at timestamptz not null default now()
 );
-create index petals_latest on public.petals (group_id, profile_id, created_at desc);
+create index if not exists petals_latest on public.petals (group_id, profile_id, created_at desc);
 
 -- Each member's newest petal. security_invoker: the caller's row-level security applies.
-create view public.latest_petals with (security_invoker = true) as
+create or replace view public.latest_petals with (security_invoker = true) as
   select distinct on (group_id, profile_id) *
   from public.petals
   order by group_id, profile_id, created_at desc;
 
 -- ── Helpers (security definer, so policies don't recurse into members) ──────
 
-create function public.is_member(g uuid) returns boolean
+create or replace function public.is_member(g uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from members where group_id = g and profile_id = auth.uid());
 $$;
 
-create function public.shares_group(p uuid) returns boolean
+create or replace function public.shares_group(p uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from members mine join members theirs on mine.group_id = theirs.group_id
@@ -67,28 +79,35 @@ alter table public.groups   enable row level security;
 alter table public.members  enable row level security;
 alter table public.petals   enable row level security;
 
+drop policy if exists "see yourself and people on your windowsills" on public.profiles;
 create policy "see yourself and people on your windowsills" on public.profiles
   for select to authenticated using (id = auth.uid() or public.shares_group(id));
+drop policy if exists "create your own profile" on public.profiles;
 create policy "create your own profile" on public.profiles
   for insert to authenticated with check (id = auth.uid());
+drop policy if exists "rename yourself" on public.profiles;
 create policy "rename yourself" on public.profiles
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
+drop policy if exists "see your windowsills" on public.groups;
 create policy "see your windowsills" on public.groups
   for select to authenticated using (public.is_member(id));
 
+drop policy if exists "see who is on your windowsills" on public.members;
 create policy "see who is on your windowsills" on public.members
   for select to authenticated using (public.is_member(group_id));
 
+drop policy if exists "see petals on your windowsills" on public.petals;
 create policy "see petals on your windowsills" on public.petals
   for select to authenticated using (public.is_member(group_id));
+drop policy if exists "plant on your windowsills" on public.petals;
 create policy "plant on your windowsills" on public.petals
   for insert to authenticated with check (profile_id = auth.uid() and public.is_member(group_id));
 
 -- Groups and members are only ever written through these two functions.
 
 -- Starts a new windowsill with you on it.
-create function public.create_group() returns public.groups
+create or replace function public.create_group() returns public.groups
 language plpgsql security definer set search_path = public as $$
 declare g groups;
 begin
@@ -99,7 +118,7 @@ begin
 end $$;
 
 -- Joins the windowsill with this invite code (at most 6 people).
-create function public.join_group(code text) returns public.groups
+create or replace function public.join_group(code text) returns public.groups
 language plpgsql security definer set search_path = public as $$
 declare g groups;
 begin

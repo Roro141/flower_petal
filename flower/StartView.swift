@@ -25,6 +25,22 @@ struct SignInView: View {
             }
             .signInWithAppleButtonStyle(.black)
             .frame(maxWidth: 280, minHeight: 50, maxHeight: 50)
+            // TEMPORARY: a test account while Sign in with Apple isn't set up. Remove before real use.
+            Button {
+                Task {
+                    do {
+                        onSignedIn(try await Auth.signInAnonymously(), nil)
+                    } catch {
+                        PetalService.log.error("anonymous sign in failed: \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+            } label: {
+                Text("try without apple")
+                    .font(Fonts.body())
+                    .foregroundStyle(Color.grey)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
             Spacer()
         }
         .padding()

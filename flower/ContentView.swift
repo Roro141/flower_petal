@@ -20,6 +20,10 @@ struct ContentView: View {
     @State private var pendingInvite: String?
     @State private var showingSamples = false
     @State private var isCutting = false
+    /// Refreshes run one at a time. One asked for while another is running (e.g. an
+    /// invite link arriving during launch) runs straight after it instead.
+    @State private var isRefreshing = false
+    @State private var needsAnotherRefresh = false
 
     var body: some View {
         Group {
@@ -57,8 +61,13 @@ struct ContentView: View {
         VStack(spacing: 32) {
             HStack {
                 // Development only: opens the sample plants and fonts.
-                Button("samples") { showingSamples = true }
-                    .frame(minHeight: 44)
+                Button { showingSamples = true } label: {
+                    Text("samples")
+                        .font(Fonts.body())
+                        .foregroundStyle(Color.grey)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
                 Spacer()
                 if let url = sill?.inviteURL {
                     ShareLink(item: url) {
@@ -96,6 +105,19 @@ struct ContentView: View {
     /// Works out where we are from the server: signed in? named? on a windowsill?
     /// Joins a pending invite on the way if there is one.
     private func refresh(suggestedName: String = "") async {
+        if isRefreshing {
+            needsAnotherRefresh = true
+            return
+        }
+        isRefreshing = true
+        repeat {
+            needsAnotherRefresh = false
+            await refreshOnce(suggestedName: suggestedName)
+        } while needsAnotherRefresh
+        isRefreshing = false
+    }
+
+    private func refreshOnce(suggestedName: String) async {
         do {
             guard let current = try await Auth.currentSession() else {
                 session = nil
@@ -164,7 +186,7 @@ struct ContentView: View {
     /// Saves the sill for the widget, redraws its images, and asks it to reload.
     private func update() {
         FlowerStore.save(sill)
-        FlowerRenderer.render(sill?.petals ?? [], onlyMissing: false)
+        FlowerRenderer.render(sill, onlyMissing: false)
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

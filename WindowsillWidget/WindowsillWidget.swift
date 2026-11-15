@@ -10,7 +10,7 @@ struct Provider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (SillEntry) -> ()) {
         Task {
             let sill = FlowerStore.load() ?? .preview
-            await FlowerRenderer.render(sill.petals, onlyMissing: true)
+            await FlowerRenderer.render(sill, onlyMissing: true)
             completion(SillEntry(date: .now, sill: sill))
         }
     }
@@ -30,7 +30,7 @@ struct Provider: TimelineProvider {
             }
             let shown = sill ?? .preview
             // Only new petals need drawing; the view just shows the files.
-            await FlowerRenderer.render(shown.petals, onlyMissing: true)
+            await FlowerRenderer.render(shown, onlyMissing: true)
             // One entry now, plus one for each moment a flower is due to wilt, so the
             // widget droops on time even without a reload or a network connection.
             let now = Date.now
@@ -68,7 +68,7 @@ struct WindowsillWidgetEntryView: View {
 
     var body: some View {
         WindowScene(sill: entry.sill, now: entry.date, boardHeight: 20, plantSpacing: 6, plantsTopInset: 22) { index, petal in
-            if let image = FlowerRenderer.image(for: petal, sillIndex: index, wilted: petal.isWilted(at: entry.date)) {
+            if let image = FlowerRenderer.image(for: petal, in: entry.sill, wilted: petal.isWilted(at: entry.date)) {
                 Image(decorative: image, scale: FlowerRenderer.scale)
                     .resizable()
                     .scaledToFit()

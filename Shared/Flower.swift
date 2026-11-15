@@ -23,20 +23,32 @@ struct Sill: Codable, Sendable {
 
     var inviteURL: URL? { URL(string: "windowsill://join/\(inviteCode)") }
 
+    /// Everyone in the order they joined (ties broken by id). The same on every phone.
+    static func joinOrder(_ members: [Member]) -> [Member] {
+        members.sorted { ($0.joinedAt ?? .distantPast, $0.id) < ($1.joinedAt ?? .distantPast, $1.id) }
+    }
+
     /// Me first, then everyone else in the order they joined.
     static func sillOrder(_ members: [Member], me: String) -> [Member] {
-        let mine = members.filter { $0.id == me }
-        let others = members.filter { $0.id != me }
-            .sorted { ($0.joinedAt ?? .distantPast) < ($1.joinedAt ?? .distantPast) }
-        return mine + others
+        members.filter { $0.id == me } + joinOrder(members).filter { $0.id != me }
+    }
+
+    /// Where someone comes in join order (0 = whoever started the windowsill). It's
+    /// the same on every phone, so it picks what should look the same everywhere:
+    /// their pot and, until they cut one, their placeholder flower.
+    func joinRank(of owner: String) -> Int {
+        Self.joinOrder(members).firstIndex { $0.id == owner } ?? 0
     }
 
     /// Each member's petal, in sill order. Someone who hasn't cut one yet gets a
-    /// sample shape (unsaved, so it never wilts) until they do.
+    /// sample shape (unsaved, so it never wilts) until they do. The sample goes by
+    /// join order, so it's the same on every phone and different for each person.
     static func petals(for members: [Member], latest: [Petal]) -> [Petal] {
-        members.enumerated().map { index, member in
+        let joined = joinOrder(members)
+        return members.enumerated().map { index, member in
             if let petal = latest.first(where: { $0.owner == member.id }) { return petal }
-            let sample = Petal.samples[index % Petal.samples.count]
+            let rank = joined.firstIndex { $0.id == member.id } ?? index
+            let sample = Petal.samples[rank % Petal.samples.count]
             return Petal(id: -(index + 1), owner: member.id, pattern: sample.pattern,
                          nPetals: sample.nPetals, points: sample.points)
         }

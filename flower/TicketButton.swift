@@ -33,6 +33,8 @@ struct TicketButton: View {
                 .foregroundStyle(isPrimary ? Color.cream : Color.ink)
                 .padding(.horizontal, 18)
                 .frame(minHeight: 44)
+                // Only as tall as the ticket itself (it grows with larger text sizes).
+                .fixedSize(horizontal: false, vertical: true)
                 .background { paper(TicketPiece(notchedEdge: .trailing)) }
                 .background(alignment: .trailing) {
                     stub
@@ -55,13 +57,9 @@ struct TicketButton: View {
     /// The stub: a short piece past the perforation that tears off and drops.
     private var stub: some View {
         paper(TicketPiece(notchedEdge: .leading))
-            .overlay(alignment: .leading) {
-                Path { path in
-                    path.move(to: .zero)
-                    path.addLine(to: CGPoint(x: 0, y: 200))
-                }
-                .stroke(perforation, style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                .clipped()
+            .overlay {
+                Perforation()
+                    .stroke(perforation, style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
             }
             .opacity(isDimmed ? 0.4 : (isTorn ? 0 : 1))
             .rotationEffect(.degrees(isTorn ? 28 : 0), anchor: .topLeading)
@@ -99,6 +97,16 @@ struct TicketButton: View {
             ticks += 1
         }
         action()
+    }
+}
+
+/// The dotted tear line down the stub's left edge, exactly as tall as the stub.
+private struct Perforation: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        return path
     }
 }
 

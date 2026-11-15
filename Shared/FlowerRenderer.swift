@@ -11,10 +11,10 @@ enum FlowerRenderer {
     static let scale: CGFloat = 3
     private static let prefix = "plant-"
 
-    /// One file per petal, sill place (the place picks the pot) and fresh/wilted.
-    static func imageURL(for petal: Petal, sillIndex: Int, wilted: Bool) -> URL? {
+    /// One file per petal, join rank (which picks the pot) and fresh/wilted.
+    static func imageURL(for petal: Petal, rank: Int, wilted: Bool) -> URL? {
         FlowerStore.containerURL?
-            .appendingPathComponent("\(prefix)\(petal.id)-\(sillIndex)\(wilted ? "-wilted" : "").png")
+            .appendingPathComponent("\(prefix)\(petal.id)-\(rank)\(wilted ? "-wilted" : "").png")
     }
 
     /// Renders the sill's plants, fresh and wilted (so the widget can switch to the
@@ -22,15 +22,16 @@ enum FlowerRenderer {
     /// With `onlyMissing`, existing files are kept as they are, which keeps widget reloads cheap.
     /// The app passes `false` so a change to the drawing code shows up on the next launch.
     @MainActor
-    static func render(_ petals: [Petal], onlyMissing: Bool) {
+    static func render(_ sill: Sill?, onlyMissing: Bool) {
         var keep = Set<String>()
-        for (index, petal) in petals.enumerated() {
+        for petal in sill?.petals ?? [] {
+            let rank = sill?.joinRank(of: petal.owner) ?? 0
             for wilted in [false, true] {
-                guard let url = imageURL(for: petal, sillIndex: index, wilted: wilted) else { continue }
+                guard let url = imageURL(for: petal, rank: rank, wilted: wilted) else { continue }
                 keep.insert(url.lastPathComponent)
                 if onlyMissing, FileManager.default.fileExists(atPath: url.path) { continue }
 
-                let plant = PlantView(petal: petal, pot: .forSill(index), size: plantSize, isWilted: wilted)
+                let plant = PlantView(petal: petal, pot: .forSill(rank), size: plantSize, isWilted: wilted)
                 let renderer = ImageRenderer(content: plant)
                 renderer.scale = scale
                 guard let image = renderer.cgImage,
@@ -47,8 +48,8 @@ enum FlowerRenderer {
     }
 
     /// Loads a rendered plant. Reads a local file only, so it's safe in a widget view.
-    static func image(for petal: Petal, sillIndex: Int, wilted: Bool) -> CGImage? {
-        guard let url = imageURL(for: petal, sillIndex: sillIndex, wilted: wilted),
+    static func image(for petal: Petal, in sill: Sill, wilted: Bool) -> CGImage? {
+        guard let url = imageURL(for: petal, rank: sill.joinRank(of: petal.owner), wilted: wilted),
               let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
