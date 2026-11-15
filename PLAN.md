@@ -25,7 +25,9 @@ Done (milestone 3, paper that looks real): window scene, fonts, hand-cut edges, 
 
 Done (milestone 4, accounts): Sign in with Apple, windowsills of up to 6, invite links, row-level security.
 
-Not done: widget push, wind, Mac.
+Done (milestone 5, widget push): planting sends a WidgetKit push to friends' widgets through the `widget-push` Edge Function; timeline reloads stay as the fallback.
+
+Not done: wind, Mac.
 
 ## Working rules
 
@@ -204,11 +206,17 @@ Setup (by hand, once): run `001_accounts_groups.sql` in the SQL Editor; in Authe
 
 Done when two fresh accounts can join one group through a link, each sees only that group's petals, and the open policies are gone.
 
-## Milestone 5: faster updates (widget push)
+## Milestone 5: faster updates (widget push) (done)
 
 - Implement `WidgetPushHandler` in the widget and save each device's widget push token to `widget_tokens(profile_id, token)`.
 - Write a Supabase Edge Function, triggered on a petals insert, that sends an APNs widget push (`apns-push-type: widgets`) to every other member's tokens. The .p8 key lives only in the function's secrets.
 - Keep timeline reloads as the fallback. Pushes are budgeted and best-effort.
+
+Steps:
+1. [x] Push Notifications capability on the app and the widget; `WindowsillPushHandler` saves the widget push token through `save_widget_token` (`003_widget_push.sql`). The app also uploads it after signing in.
+2. [x] Edge Function `supabase/functions/widget-push`: re-reads the new petal, finds the other members' tokens, signs an APNs token with the .p8 key and sends `apns-push-type: widgets`. Removes tokens Apple says are gone (410).
+3. [x] Setup by hand: Apple push key (.p8), run `003_widget_push.sql`, create the function in the dashboard, add its secrets (APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_PRIVATE_KEY), add the `petal-planted` database webhook on `petals` inserts.
+4. [x] Tested (phone + simulator): a friend's new flower showed on the widget almost instantly.
 
 Done when a new petal usually shows on a friend's widget within a minute or two.
 

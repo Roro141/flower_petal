@@ -132,6 +132,8 @@ struct ContentView: View {
             sill = try await PetalService.fetchSill(current)
             update()
             stage = sill == nil ? .needsWindowsill : .window
+            // The widget may have made its push token before anyone signed in.
+            await PushTokens.uploadCurrent()
         } catch {
             // Offline or a server hiccup: stay on whatever we were showing.
             PetalService.log.error("refresh failed: \(error.localizedDescription, privacy: .public)")

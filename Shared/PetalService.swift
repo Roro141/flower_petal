@@ -113,6 +113,14 @@ enum PetalService {
                     members: ordered, petals: Sill.petals(for: ordered, latest: latest.map(Petal.init(row:))))
     }
 
+    /// Saves this phone's widget push token for me, so friends' new petals can nudge my widget.
+    static func saveWidgetToken(_ token: String, environment: String, _ session: Session) async throws {
+        var request = makeRequest(path: "rpc/save_widget_token", session: session)
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(["token": token, "environment": environment])
+        try await sendIgnoringBody(request)
+    }
+
     /// Plants `petal` on the windowsill and returns it as stored, with its id and time.
     static func plant(_ petal: Petal, groupID: String, _ session: Session) async throws -> Petal {
         var request = makeRequest(path: "petals", session: session)

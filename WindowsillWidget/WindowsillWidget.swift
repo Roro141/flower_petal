@@ -79,6 +79,15 @@ struct WindowsillWidgetEntryView: View {
     }
 }
 
+/// Receives this widget's push token from WidgetKit and saves it to Supabase, so a
+/// friend planting can reload this widget straight away.
+struct WindowsillPushHandler: WidgetPushHandler {
+    func pushTokenDidChange(_ pushInfo: WidgetPushInfo, widgets: [WidgetInfo]) {
+        let token = pushInfo.token
+        Task { await PushTokens.upload(token) }
+    }
+}
+
 struct WindowsillWidget: Widget {
     let kind: String = "WindowsillWidget"
 
@@ -89,6 +98,8 @@ struct WindowsillWidget: Widget {
         }
         // The window runs to the widget's edges.
         .contentMarginsDisabled()
+        // Pushes add to the timeline reloads; they never replace them.
+        .pushHandler(WindowsillPushHandler.self)
         .configurationDisplayName("Windowsill")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
