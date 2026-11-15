@@ -169,7 +169,7 @@ Steps:
 3. [x] Irregular edges: 0.5–1.5 px noise on every clip path (petals, leaves, pots, scene pieces), pattern untouched.
 4. [x] Paper grain overlay (3–5%) and cast shadows that vary with each piece's height.
 5. [—] Scanned textures: skipped. Decision: keep the code-drawn papers.
-6. [ ] Resting friend: desaturated paper, drooped head (needs a rule for when someone is "resting").
+6. [x] Resting friend: desaturated paper, drooped head. Rule: a flower wilts 2 days after it was planted unless its owner plants a newer one; nothing about the time is shown on screen. `Petal.wiltsAfter` is set to 10 minutes for testing; switch it back to 2 days before real use.
 
 Done when side by side with the mockups on the Windowsill canvas, it reads as paper, not vector art.
 

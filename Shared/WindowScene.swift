@@ -8,6 +8,8 @@ import SwiftUI
 /// friend's plant: live in the app, a pre-rendered PNG in the widget.
 struct WindowScene<Plant: View>: View {
     let petals: [Petal]
+    /// The moment being shown; decides who has wilted (for VoiceOver).
+    var now = Date.now
     var boardHeight: CGFloat = 26
     var plantSpacing: CGFloat = 12
     /// Keeps plants that size themselves to fit (the widget's images) below the top of the frame.
@@ -26,7 +28,9 @@ struct WindowScene<Plant: View>: View {
                             .frame(height: boardHeight)
                     }
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
+                    .accessibilityLabel(petal.isWilted(at: now)
+                        ? "\(SpikeUsers.name(for: petal.owner))'s flower, resting"
+                        : "\(SpikeUsers.name(for: petal.owner))'s flower")
                 }
             }
             .padding(.top, plantsTopInset)

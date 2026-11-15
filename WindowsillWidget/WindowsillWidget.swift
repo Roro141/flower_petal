@@ -28,9 +28,13 @@ struct Provider: TimelineProvider {
             }
             // Only new petals need drawing; the view just shows the files.
             await FlowerRenderer.render(petals, onlyMissing: true)
+            // One entry now, plus one for each moment a flower is due to wilt, so the
+            // widget droops on time even without a reload or a network connection.
+            let now = Date.now
+            let wiltDates = petals.compactMap(\.wiltDate).filter { $0 > now }.sorted()
+            let entries = ([now] + wiltDates).map { SillEntry(date: $0, petals: petals) }
             // Ask WidgetKit to come back in 15 minutes; pushes can wake it sooner.
-            let next = Date.now.addingTimeInterval(15 * 60)
-            completion(Timeline(entries: [SillEntry(date: .now, petals: petals)], policy: .after(next)))
+            completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(15 * 60))))
         }
     }
 
@@ -61,8 +65,8 @@ struct WindowsillWidgetEntryView: View {
     var entry: Provider.Entry
 
     var body: some View {
-        WindowScene(petals: entry.petals, boardHeight: 20, plantSpacing: 6, plantsTopInset: 22) { index, petal in
-            if let image = FlowerRenderer.image(for: petal, sillIndex: index) {
+        WindowScene(petals: entry.petals, now: entry.date, boardHeight: 20, plantSpacing: 6, plantsTopInset: 22) { index, petal in
+            if let image = FlowerRenderer.image(for: petal, sillIndex: index, wilted: petal.isWilted(at: entry.date)) {
                 Image(decorative: image, scale: FlowerRenderer.scale)
                     .resizable()
                     .scaledToFit()

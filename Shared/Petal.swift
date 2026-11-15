@@ -134,3 +134,19 @@ extension Petal {
         )
     }
 }
+
+extension Petal {
+    /// How long a flower stays fresh. If its owner hasn't planted a newer one by
+    /// then, it wilts; planting again brings a fresh one. Nothing about this time is
+    /// ever shown on screen.
+    /// TESTING: 10 minutes. The real value is 2 days: `2 * 24 * 60 * 60`.
+    static let wiltsAfter: TimeInterval = 10 * 60
+
+    /// When this flower wilts, if it has been saved (unsaved petals have no date yet).
+    var wiltDate: Date? { createdAt?.addingTimeInterval(Self.wiltsAfter) }
+
+    func isWilted(at date: Date) -> Bool {
+        guard let wiltDate else { return false }
+        return date >= wiltDate
+    }
+}

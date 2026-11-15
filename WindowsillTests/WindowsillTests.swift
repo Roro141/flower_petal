@@ -87,6 +87,17 @@ struct WindowsillTests {
         #expect(pots.count == PotStyle.allCases.count)
     }
 
+    @Test func flowerWiltsOnlyAfterItsTime() {
+        let planted = Date(timeIntervalSince1970: 1_000_000)
+        var petal = Petal.samples[0]
+        petal.createdAt = planted
+        #expect(!petal.isWilted(at: planted))
+        #expect(!petal.isWilted(at: planted.addingTimeInterval(Petal.wiltsAfter - 1)))
+        #expect(petal.isWilted(at: planted.addingTimeInterval(Petal.wiltsAfter)))
+        // A petal that hasn't been saved yet has no date, so it never wilts.
+        #expect(!Petal.samples[0].isWilted(at: .distantFuture))
+    }
+
     @Test func randomPetalIsAValidSample() {
         let petal = Petal.random(owner: "a")
         #expect((5...8).contains(petal.nPetals))
@@ -99,8 +110,10 @@ struct WindowsillTests {
         let petals = FlowerStore.defaultPetals
         FlowerRenderer.render(petals, onlyMissing: false)
         for (index, petal) in petals.enumerated() {
-            let image = try #require(FlowerRenderer.image(for: petal, sillIndex: index))
-            #expect(image.width == Int(FlowerRenderer.plantSize * FlowerRenderer.scale))
+            for wilted in [false, true] {
+                let image = try #require(FlowerRenderer.image(for: petal, sillIndex: index, wilted: wilted))
+                #expect(image.width == Int(FlowerRenderer.plantSize * FlowerRenderer.scale))
+            }
         }
     }
 

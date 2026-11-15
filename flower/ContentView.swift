@@ -28,7 +28,10 @@ struct ContentView: View {
                 .frame(minHeight: 44)
 
             Spacer()
-            SillView(petals: petals, plantSize: 80)
+            // Redrawn every minute so a flower wilts on screen when its time comes.
+            TimelineView(.everyMinute) { context in
+                SillView(petals: petals, plantSize: 80, now: context.date)
+            }
             TicketButton("plant a random petal") { plant(Petal.random(owner: myID)) }
                 .disabled(isPlanting)
             TicketButton("cut") { isCutting = true }

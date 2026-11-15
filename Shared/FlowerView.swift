@@ -209,8 +209,21 @@ struct PlantView: View {
     let petal: Petal
     let pot: PotStyle
     let size: CGFloat
+    /// Resting: faded paper, the stem bent over and the head hanging down.
+    var isWilted = false
 
     private var height: CGFloat { size * 1.76 }
+
+    /// Which way a wilted head hangs (the same way every time for each owner).
+    private var droopSide: CGFloat {
+        var random = SeededRandom(petal.owner + "-droop")
+        return random.next() < 0.5 ? -1 : 1
+    }
+
+    /// Where the wilted head hangs, relative to where it stands when fresh.
+    private var headDrop: CGSize {
+        isWilted ? CGSize(width: droopSide * size * 0.3, height: size * 0.3) : .zero
+    }
 
     var body: some View {
         Canvas { context, canvasSize in
@@ -219,7 +232,12 @@ struct PlantView: View {
         .frame(width: size, height: height)
         .overlay(alignment: .top) {
             FlowerView(petal: petal, size: size)
+                .scaleEffect(isWilted ? 0.88 : 1)
+                .rotationEffect(.degrees(isWilted ? Double(droopSide) * 55 : 0))
+                .offset(headDrop)
         }
+        // Faded paper, never see-through.
+        .saturation(isWilted ? 0.25 : 1)
     }
 
     /// Stem, leaves, then pot body and rim, each with a hard shadow set by how high it sits.
@@ -250,9 +268,22 @@ struct PlantView: View {
         let rimTop = bodyTop - rimHeight * 0.6
 
         // Stem: a slightly tapered strip from the flower centre down behind the rim.
-        let stemTop = CGPoint(x: centreX, y: size / 2)
+        // Wilted, it rises to a bend just below where the head stood, then hangs over
+        // to the drooping head.
+        let headCentre = CGPoint(x: centreX + headDrop.width, y: size / 2 + headDrop.height)
+        let stemTop = isWilted ? CGPoint(x: centreX + droopSide * size * 0.06, y: size / 2 + size * 0.02) : headCentre
         let stemBottom = CGPoint(x: centreX + (random.next() - 0.5) * size * 0.08, y: rimTop + rimHeight * 0.3)
         let stemWidth = size * 0.045
+        if isWilted {
+            // The bent-over part: its own strip from the bend to the head.
+            let bend = RoughEdge.path(through: [
+                CGPoint(x: stemTop.x - stemWidth / 2, y: stemTop.y - stemWidth / 2),
+                CGPoint(x: headCentre.x + stemWidth / 2, y: headCentre.y - stemWidth / 2),
+                CGPoint(x: headCentre.x - stemWidth / 2, y: headCentre.y + stemWidth / 2),
+                CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y + stemWidth / 2),
+            ], random: &edges)
+            paper(bend, .mat, lift: 0.7)
+        }
         paper(cut([
             CGPoint(x: stemTop.x - stemWidth / 2, y: stemTop.y),
             CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y),
@@ -269,7 +300,8 @@ struct PlantView: View {
             let attach = CGPoint(x: stemTop.x + (stemBottom.x - stemTop.x) * along,
                                  y: stemTop.y + (stemBottom.y - stemTop.y) * along)
             let length = size * (0.32 + random.next() * 0.08)
-            let angle = side * (50 + random.next() * 20) * .pi / 180
+            // Wilted leaves hang lower.
+            let angle = side * (50 + random.next() * 20 + (isWilted ? 35 : 0)) * .pi / 180
             let place = CGAffineTransform(rotationAngle: angle)
                 .concatenating(CGAffineTransform(translationX: attach.x, y: attach.y))
             let leafRect = CGRect(x: -length / 2, y: -length, width: length, height: length)
@@ -359,10 +391,12 @@ struct NameLabel: View {
 struct SillView: View {
     let petals: [Petal]
     var plantSize: CGFloat = 80
+    /// The moment being shown; decides who has wilted.
+    var now = Date.now
 
     var body: some View {
-        WindowScene(petals: petals) { index, petal in
-            PlantView(petal: petal, pot: .forSill(index), size: plantSize)
+        WindowScene(petals: petals, now: now) { index, petal in
+            PlantView(petal: petal, pot: .forSill(index), size: plantSize, isWilted: petal.isWilted(at: now))
         }
         // Room for the plants plus some window above them.
         .frame(height: plantSize * 2.6 + 26)
@@ -373,6 +407,15 @@ struct SillView: View {
     PlantView(petal: Petal.samples[0], pot: .tapered, size: 200)
         .padding()
         .background(Color.wall)
+}
+
+#Preview("Fresh and wilted") {
+    HStack(spacing: 24) {
+        PlantView(petal: Petal.samples[1], pot: .tin, size: 140)
+        PlantView(petal: Petal.samples[1], pot: .tin, size: 140, isWilted: true)
+    }
+    .padding()
+    .background(Color.wall)
 }
 
 #Preview("Sill") {

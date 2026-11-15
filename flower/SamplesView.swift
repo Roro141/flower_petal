@@ -9,6 +9,11 @@ struct SamplesView: View {
                 ForEach(Array(Petal.samples.enumerated()), id: \.element.id) { index, petal in
                     PlantView(petal: petal, pot: PotStyle.allCases[index % PotStyle.allCases.count], size: 150)
                 }
+                // The same plants, wilted.
+                ForEach(Array(Petal.samples.enumerated()), id: \.element.id) { index, petal in
+                    PlantView(petal: petal, pot: PotStyle.allCases[index % PotStyle.allCases.count], size: 150,
+                              isWilted: true)
+                }
             }
             .padding(24)
             VStack(alignment: .leading, spacing: 18) {
