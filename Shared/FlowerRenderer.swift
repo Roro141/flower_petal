@@ -11,10 +11,11 @@ enum FlowerRenderer {
     static let scale: CGFloat = 3
     private static let prefix = "plant-"
 
-    /// One file per petal, join rank (which picks the pot) and fresh/wilted.
-    static func imageURL(for petal: Petal, rank: Int, wilted: Bool) -> URL? {
-        FlowerStore.containerURL?
-            .appendingPathComponent("\(prefix)\(petal.id)-\(rank)\(wilted ? "-wilted" : "").png")
+    /// One file per petal, join rank (which picks the pot), blown-off petal and fresh/wilted.
+    static func imageURL(for petal: Petal, rank: Int, missing: Set<Int>, wilted: Bool) -> URL? {
+        let gap = missing.isEmpty ? "" : "-gap" + missing.sorted().map(String.init).joined(separator: ".")
+        return FlowerStore.containerURL?
+            .appendingPathComponent("\(prefix)\(petal.id)-\(rank)\(gap)\(wilted ? "-wilted" : "").png")
     }
 
     /// Renders the sill's plants, fresh and wilted (so the widget can switch to the
@@ -26,12 +27,14 @@ enum FlowerRenderer {
         var keep = Set<String>()
         for petal in sill?.petals ?? [] {
             let rank = sill?.joinRank(of: petal.owner) ?? 0
+            let missing = sill?.missingPetals(for: petal) ?? []
             for wilted in [false, true] {
-                guard let url = imageURL(for: petal, rank: rank, wilted: wilted) else { continue }
+                guard let url = imageURL(for: petal, rank: rank, missing: missing, wilted: wilted) else { continue }
                 keep.insert(url.lastPathComponent)
                 if onlyMissing, FileManager.default.fileExists(atPath: url.path) { continue }
 
-                let plant = PlantView(petal: petal, pot: .forSill(rank), size: plantSize, isWilted: wilted)
+                let plant = PlantView(petal: petal, pot: .forSill(rank), size: plantSize, isWilted: wilted,
+                                      missingPetals: missing)
                 let renderer = ImageRenderer(content: plant)
                 renderer.scale = scale
                 guard let image = renderer.cgImage,
@@ -49,7 +52,8 @@ enum FlowerRenderer {
 
     /// Loads a rendered plant. Reads a local file only, so it's safe in a widget view.
     static func image(for petal: Petal, in sill: Sill, wilted: Bool) -> CGImage? {
-        guard let url = imageURL(for: petal, rank: sill.joinRank(of: petal.owner), wilted: wilted),
+        guard let url = imageURL(for: petal, rank: sill.joinRank(of: petal.owner),
+                                 missing: sill.missingPetals(for: petal), wilted: wilted),
               let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }

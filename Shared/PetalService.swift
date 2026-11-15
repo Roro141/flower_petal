@@ -37,6 +37,12 @@ enum PetalService {
         let groups: GroupRow?
     }
 
+    private struct GustRow: Decodable {
+        let id: Int
+        let seed: Int
+        let created_at: Date
+    }
+
     private struct ProfileName: Decodable {
         let name: String
     }
@@ -109,8 +115,26 @@ enum PetalService {
             session: session
         )
         let latest: [PetalRow] = try await send(petalRequest)
+
+        let gustRequest = makeRequest(
+            path: "gusts",
+            // The last 30 gusts are plenty: petals lost before a flower was planted don't count.
+            query: "select=id,seed,created_at&group_id=eq.\(mine.group_id)&order=created_at.desc&limit=30",
+            session: session
+        )
+        let gusts: [GustRow] = try await send(gustRequest)
+
         return Sill(groupID: mine.group_id, inviteCode: inviteCode, myID: session.userID,
-                    members: ordered, petals: Sill.petals(for: ordered, latest: latest.map(Petal.init(row:))))
+                    members: ordered, petals: Sill.petals(for: ordered, latest: latest.map(Petal.init(row:))),
+                    gusts: gusts.reversed().map { Gust(id: $0.id, seed: $0.seed, createdAt: $0.created_at) })
+    }
+
+    /// TEMPORARY, for testing: blows a gust through my windowsill right now.
+    static func testGust(_ session: Session) async throws {
+        var request = makeRequest(path: "rpc/test_gust", session: session)
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        try await sendIgnoringBody(request)
     }
 
     /// Saves this phone's widget push token for me, so friends' new petals can nudge my widget.

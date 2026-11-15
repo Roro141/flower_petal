@@ -21,6 +21,10 @@ struct ContentView: View {
     @State private var isCutting = false
     /// Refreshes run one at a time. One asked for while another is running (e.g. an
     /// invite link arriving during launch) runs straight after it instead.
+    /// Bumped to play a gust in the window; see `SillView`.
+    @State private var gustPlays = 0
+    @State private var gustSpeed = 1.0
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isRefreshing = false
     @State private var needsAnotherRefresh = false
 
@@ -72,9 +76,17 @@ struct ContentView: View {
             Spacer()
             if let sill {
                 // Redrawn every minute so a flower wilts on screen when its time comes.
-                TimelineView(.everyMinute) { context in
-                    SillView(sill: sill, plantSize: 96, now: context.date)
+                let window = TimelineView(.everyMinute) { context in
+                    SillView(sill: sill, plantSize: 96, now: context.date, gustPlays: gustPlays, gustSpeed: gustSpeed)
                 }
+                #if DEBUG
+                // TEMPORARY, for testing: a long press on the window blows a gust right now.
+                window.onLongPressGesture(minimumDuration: 0.8) {
+                    Task { await testGust() }
+                }
+                #else
+                window
+                #endif
             }
             Spacer()
             TicketButton("cut") { isCutting = true }
@@ -85,6 +97,16 @@ struct ContentView: View {
             // The wall, with the same grain as the window (which has its own).
             Color.wall.ignoresSafeArea()
             PaperGrain().ignoresSafeArea()
+        }
+        // Check for friends' petals and gusts while the window is open, and on coming back to it.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                await refresh()
+            }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active { Task { await refresh() } }
         }
         .fullScreenCover(isPresented: $isCutting) {
             CutView(owner: sill?.myID ?? "", paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
@@ -129,9 +151,14 @@ struct ContentView: View {
                 pendingInvite = nil
                 try await PetalService.joinGroup(code: code, current)
             }
-            sill = try await PetalService.fetchSill(current)
-            update()
+            let fetched = try await PetalService.fetchSill(current)
+            // Only touch the widget when something changed (this runs every minute).
+            if fetched != sill {
+                sill = fetched
+                update()
+            }
             stage = sill == nil ? .needsWindowsill : .window
+            playNewGust()
             // The widget may have made its push token before anyone signed in.
             await PushTokens.uploadCurrent()
         } catch {
@@ -140,6 +167,29 @@ struct ContentView: View {
             if case .loading = stage { stage = sill == nil ? .signedOut : .window }
         }
     }
+
+    /// Plays the last gust if this phone hasn't shown it yet: at full speed if it just
+    /// blew, otherwise once, compressed, as a catch-up.
+    private func playNewGust() {
+        guard let gust = sill?.gust else { return }
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: "lastPlayedGust") != gust.id else { return }
+        defaults.set(gust.id, forKey: "lastPlayedGust")
+        gustSpeed = Date.now.timeIntervalSince(gust.createdAt) < 120 ? 1 : Gust.catchUpSpeed
+        gustPlays += 1
+    }
+
+    #if DEBUG
+    private func testGust() async {
+        guard let session else { return }
+        do {
+            try await PetalService.testGust(session)
+        } catch {
+            PetalService.log.error("test gust failed: \(error.localizedDescription, privacy: .public)")
+        }
+        await refresh()
+    }
+    #endif
 
     private func saveName(_ name: String) async {
         guard let session else { return }

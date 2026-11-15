@@ -100,6 +100,85 @@ struct WindowsillTests {
         #expect(Set(petals1.map(\.pattern)).count == 4)
     }
 
+    // MARK: - Wind
+
+    private func gustySill(seeds: [Int], firstGustAt: Date = Date(timeIntervalSince1970: 1_000)) -> Sill {
+        let start = Date(timeIntervalSince1970: 0)
+        let members = (0..<4).map { Member(id: "m\($0)", name: "m\($0)", joinedAt: start.addingTimeInterval(Double($0))) }
+        var sill = Sill(groupID: "g", inviteCode: "", myID: "m0", members: members,
+                        petals: Sill.petals(for: members, latest: []))
+        sill.gusts = seeds.enumerated().map { index, seed in
+            Gust(id: index + 1, seed: seed, createdAt: firstGustAt.addingTimeInterval(Double(index) * 60))
+        }
+        return sill
+    }
+
+    @Test func aGustAimsAtOneOrTwoDifferentFlowers() {
+        for seed in 0..<50 {
+            let sill = gustySill(seeds: [seed])
+            let aims = sill.aims(of: sill.gusts[0])
+            #expect((1...2).contains(aims.count))
+            #expect(Set(aims.map(\.owner)).count == aims.count)
+        }
+    }
+
+    @Test func everyPhoneSeesTheSameLosses() {
+        let sill = gustySill(seeds: [12, 34, 56])
+        var otherPhone = sill
+        otherPhone.myID = "m3"
+        otherPhone.members = Sill.sillOrder(sill.members, me: "m3")
+        otherPhone.petals = Sill.petals(for: otherPhone.members, latest: [])
+        for petal in sill.petals {
+            let same = otherPhone.petals.first { $0.owner == petal.owner }!
+            #expect(sill.missingPetals(for: petal) == otherPhone.missingPetals(for: same))
+        }
+    }
+
+    @Test func gustsAddUpAndNeverTakeTheSamePetalTwice() {
+        // Many gusts: every loss is a different petal, and fallen petals match the gaps.
+        let sill = gustySill(seeds: Array(1...30))
+        for petal in sill.petals {
+            let losses = sill.windLosses[petal.owner] ?? []
+            #expect(Set(losses.map(\.petal)).count == losses.count)
+            #expect(sill.missingPetals(for: petal).count == losses.count)
+            // Always still a flower.
+            #expect(min(max(petal.nPetals, 5), 8) - losses.count >= 2)
+        }
+        let total = sill.windLosses.values.map(\.count).reduce(0, +)
+        #expect(total > sill.gusts.count / 2)
+    }
+
+    @Test func aFlowerPlantedAfterTheGustsIsWholeAndItsFallenPetalsAreSwept() throws {
+        var sill = gustySill(seeds: [99, 98, 97])
+        let owner = try #require(sill.windLosses.keys.first)
+        let index = try #require(sill.petals.firstIndex { $0.owner == owner })
+        #expect(!sill.missingPetals(for: sill.petals[index]).isEmpty)
+
+        let afterAll = sill.gusts.last!.createdAt.addingTimeInterval(60)
+        sill.petals[index] = Petal(id: 7, owner: owner, pattern: .dots, nPetals: 6,
+                                   points: Petal.sampleShapes[0], createdAt: afterAll)
+        #expect(sill.missingPetals(for: sill.petals[index]).isEmpty)
+        #expect(sill.windLosses[owner] == nil)
+    }
+
+    @Test func whileTheNewestGustBlowsOnlyItsPetalsAreStillOn() {
+        let sill = gustySill(seeds: Array(1...10))
+        for petal in sill.petals {
+            let all = sill.missingPetals(for: petal)
+            let before = sill.missingPetals(for: petal, exceptNewest: true)
+            #expect(before.isSubset(of: all))
+            let newest = (sill.windLosses[petal.owner] ?? []).filter { $0.gust == sill.gust }.count
+            #expect(all.count - before.count == newest)
+        }
+    }
+
+    @Test func leansStayBetweenTenAndTwentyTwoDegrees() {
+        let gust = Gust(id: 3, seed: 5, createdAt: .now)
+        for owner in ["a", "b", "c", "d", "e", "f"] {
+            #expect((10...22).contains(gust.lean(for: owner)))
+        }
+    }
+
     @Test func membersWithoutAPetalGetUniquePlaceholders() {
         let members = (0..<6).map { Member(id: "m\($0)", name: "m\($0)") }
         // Saved petals always have positive ids from the server.

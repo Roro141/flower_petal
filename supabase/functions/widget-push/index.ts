@@ -1,8 +1,9 @@
 // Windowsill: widget-push
 //
-// Called by a database webhook whenever a row is inserted into `petals`.
-// Sends a WidgetKit push to every *other* member of that windowsill, so their
-// widget reloads and shows the new flower. Pushes are budgeted by iOS, so this
+// Called by database webhooks whenever a row is inserted into `petals` or `gusts`.
+// A new petal: sends a WidgetKit push to every *other* member of that windowsill,
+// so their widget reloads and shows the new flower. A gust: pushes to everyone on
+// the windowsill, so their widget shows the petals that blew onto the sill. Pushes are budgeted by iOS, so this
 // only speeds things up; widgets still refresh on their own timeline.
 //
 // Secrets (Edge Functions → Secrets):
@@ -87,19 +88,22 @@ Deno.serve(async (request) => {
   try {
     const payload = await request.json();
     const id = payload?.record?.id;
-    if (payload?.type !== "INSERT" || payload?.table !== "petals" || !id) {
+    const table = payload?.table;
+    if (payload?.type !== "INSERT" || (table !== "petals" && table !== "gusts") || !id) {
       return new Response("ignored", { status: 200 });
     }
 
-    // Re-read the petal rather than trusting the request, and only push for new ones.
-    const [petal] = await select(`petals?select=id,group_id,profile_id,created_at&id=eq.${id}`);
-    if (!petal || Date.now() - Date.parse(petal.created_at) > 5 * 60 * 1000) {
-      return new Response("no recent petal", { status: 200 });
+    // Re-read the row rather than trusting the request, and only push for new ones.
+    const columns = table === "petals" ? "id,group_id,profile_id,created_at" : "id,group_id,created_at";
+    const [row] = await select(`${table}?select=${columns}&id=eq.${id}`);
+    if (!row || Date.now() - Date.parse(row.created_at) > 5 * 60 * 1000) {
+      return new Response("nothing recent", { status: 200 });
     }
 
-    const members = await select(`members?select=profile_id&group_id=eq.${petal.group_id}`);
-    const friends = members.map((m) => m.profile_id).filter((p) => p !== petal.profile_id);
-    if (friends.length === 0) return new Response("no friends to tell", { status: 200 });
+    // A petal: everyone but whoever planted it. A gust: everyone.
+    const members = await select(`members?select=profile_id&group_id=eq.${row.group_id}`);
+    const friends = members.map((m) => m.profile_id).filter((p) => p !== row.profile_id);
+    if (friends.length === 0) return new Response("no one to tell", { status: 200 });
 
     const tokens = await select(
       `widget_tokens?select=token,environment&profile_id=in.(${friends.join(",")})`,

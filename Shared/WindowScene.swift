@@ -14,15 +14,57 @@ struct WindowScene<Plant: View>: View {
     var plantSpacing: CGFloat = 12
     /// Keeps plants that size themselves to fit (the widget's images) below the top of the frame.
     var plantsTopInset: CGFloat = 0
+    /// Whether the newest gust's fallen petals are on the sill yet (false while it's still
+    /// blowing). Petals from earlier gusts are always there.
+    var showFallen = true
+    var fallenPetalSize: CGFloat = 28
+    /// Bumped to play a gust: the curtains billow. The widget never sets it, so it never moves.
+    var gustPlays = 0
+    /// 1 for a live gust; higher plays a missed gust faster.
+    var gustSpeed = 1.0
+    /// How far above the bottom of a plant its flower head sits, so a blown-off petal
+    /// can fly from there to the sill. Only used while a gust plays.
+    var flowerHeadHeight: CGFloat = 0
     @ViewBuilder var plant: (_ index: Int, _ petal: Petal) -> Plant
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            WindowBackdrop(boardHeight: boardHeight)
+            KeyframeAnimator(initialValue: CGFloat(0), trigger: gustPlays) { billow in
+                WindowBackdrop(boardHeight: boardHeight, billow: billow)
+            } keyframes: { _ in
+                // Out with the gust, held, then falling back with a little sway.
+                LinearKeyframe(1, duration: 0.45 / gustSpeed, timingCurve: Gust.leanCurve)
+                LinearKeyframe(1, duration: 0.45 / gustSpeed)
+                SpringKeyframe(0, duration: 1.4 / gustSpeed, spring: Gust.springBack(speed: gustSpeed))
+            }
             HStack(alignment: .bottom, spacing: plantSpacing) {
                 ForEach(Array(sill.petals.enumerated()), id: \.element.id) { index, petal in
                     VStack(spacing: 0) {
                         plant(index, petal)
+                            .overlay(alignment: .bottom) {
+                                // Every petal this flower has lost since it was planted.
+                                ZStack {
+                                    ForEach(sill.windLosses[petal.owner] ?? [], id: \.gust.id) { loss in
+                                        if loss.gust != sill.gust {
+                                            // From an earlier gust: lying where it landed.
+                                            FallenPetal(petal: petal, gust: loss.gust, size: fallenPetalSize)
+                                        } else if showFallen {
+                                            // The newest gust's petal flies from the flower to the sill
+                                            // as the gust plays.
+                                            KeyframeAnimator(initialValue: CGFloat(0), trigger: gustPlays) { flight in
+                                                FallenPetal(petal: petal, gust: loss.gust, size: fallenPetalSize,
+                                                            flight: flight, headHeight: flowerHeadHeight)
+                                            } keyframes: { _ in
+                                                MoveKeyframe(1)
+                                                LinearKeyframe(1, duration: Gust.releaseDelay(flowers: sill.petals.count,
+                                                                                              speed: gustSpeed))
+                                                LinearKeyframe(0, duration: Gust.flightTime / gustSpeed, timingCurve: .easeIn)
+                                            }
+                                            .transition(.opacity)
+                                        }
+                                    }
+                                }
+                            }
                         // The pot stands on the board; the name sits on its front.
                         NameLabel(name: sill.name(for: petal.owner))
                             .frame(height: boardHeight)
@@ -39,9 +81,46 @@ struct WindowScene<Plant: View>: View {
     }
 }
 
+/// A petal the wind blew off, lying on the sill board by its pot. Where it lands and
+/// how it's turned come from the gust, so it's the same on every phone.
+private struct FallenPetal: View {
+    let petal: Petal
+    let gust: Gust
+    let size: CGFloat
+    /// 0 = lying on the sill. 1 = still on the flower, `headHeight` above. In between,
+    /// it's in the air: carried right by the wind in an arc, tumbling, then dropping.
+    var flight: CGFloat = 0
+    var headHeight: CGFloat = 0
+
+    var body: some View {
+        var random = SeededRandom("\(petal.owner)-\(gust.id)-fallen")
+        let turn = 70 + random.next() * 50
+        // Blown to the right of its pot, the way the wind goes; each gust's lands somewhere else.
+        let drift = (0.2 + random.next() * 1.6) * size
+        let t = flight
+        let x = drift * (1 - t) + size * 0.6 * t + sin(.pi * (1 - t)) * size * 1.4
+        let y = size * 0.35 * (1 - t) - headHeight * t
+        return PaperFill(paper: petal.pattern, scale: size * 0.12)
+            .clipShape(PetalPath(points: petal.points))
+            .frame(width: size, height: size)
+            .background {
+                PetalPath(points: petal.points).fill(PaperShadow.colour(lift: 0.5))
+                    .offset(PaperShadow.offset(lift: 0.5, unit: size * 0.06))
+            }
+            .rotationEffect(.degrees(turn + Double(t) * 400))
+            .offset(x: x, y: y)
+            // Until it lets go, it's still part of the flower.
+            .opacity(t > 0.999 ? 0 : 1)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Everything in the window except the plants, drawn as layered paper pieces.
 private struct WindowBackdrop: View {
     let boardHeight: CGFloat
+    /// 0 = curtains hanging still, 1 = blown in by a gust.
+    var billow: CGFloat = 0
 
     var body: some View {
         Canvas { context, size in
@@ -92,11 +171,12 @@ private struct WindowBackdrop: View {
             // Curtains: the left one hangs longer than the right.
             let top = window.minY - strip * 0.2
             piece(RoughEdge.path(through: curtain(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
-                                                  length: window.height * 0.74, flaresLeft: true), random: &edges),
+                                                  length: window.height * 0.74, flaresLeft: true, billow: billow),
+                                 random: &edges),
                   .cream, lift: 1.4)
             piece(RoughEdge.path(through: curtain(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top,
                                                   width: window.width * 0.2, length: window.height * 0.56,
-                                                  flaresLeft: false), random: &edges),
+                                                  flaresLeft: false, billow: billow), random: &edges),
                   .cream, lift: 1.4)
             for line in curtainFolds(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
                                      length: window.height * 0.74) +
@@ -118,10 +198,15 @@ private struct WindowBackdrop: View {
 
     /// A hanging curtain: straight along the rod, flaring a little towards the wall,
     /// with a snipped zigzag hem.
-    private func curtain(x: CGFloat, top: CGFloat, width: CGFloat, length: CGFloat, flaresLeft: Bool) -> [CGPoint] {
+    /// `billow` swings the hem to the right, the way the wind blows (the same way the
+    /// flowers lean), and lifts it a little. The right curtain, sheltered by the frame, moves less.
+    private func curtain(x: CGFloat, top: CGFloat, width: CGFloat, length: CGFloat, flaresLeft: Bool,
+                         billow: CGFloat = 0) -> [CGPoint] {
         let flare = width * 0.12
-        let bottomLeft = x - (flaresLeft ? flare : -flare * 0.3)
-        let bottomRight = x + width + (flaresLeft ? -flare * 0.3 : flare)
+        let swing = billow * width * (flaresLeft ? 0.55 : 0.35)
+        let length = length * (1 - billow * 0.12)
+        let bottomLeft = x - (flaresLeft ? flare : -flare * 0.3) + swing
+        let bottomRight = x + width + (flaresLeft ? -flare * 0.3 : flare) + swing
         var points = [CGPoint(x: x, y: top), CGPoint(x: x + width, y: top), CGPoint(x: bottomRight, y: top + length)]
         // Hem: right to left, every other point snipped 4 pt lower.
         let hemPoints = 12
@@ -144,9 +229,18 @@ private struct WindowBackdrop: View {
     }
 }
 
+#Preview("After a gust") {
+    var sill = Sill.preview
+    sill.gusts = (1...4).map { Gust(id: $0, seed: $0 * 7, createdAt: .now) }
+    return SillView(sill: sill, plantSize: 90)
+}
+
 #Preview {
     WindowScene(sill: .preview) { index, petal in
         PlantView(petal: petal, pot: .forSill(index), size: 80)  // preview only
     }
     .frame(height: 260)
 }
+
+
+

@@ -10,6 +10,8 @@ struct FlowerView: View {
     /// true the petals rotate out one after another (about 1 s, 90 ms apart, ease-out).
     /// Widgets and rendered PNGs always pass true, so they never animate.
     var isOpen = true
+    /// Petals the wind blew off (indexes into the petals), drawn as gaps.
+    var missingPetals: Set<Int> = []
 
     private static let unfoldStagger = 0.09
 
@@ -28,7 +30,7 @@ struct FlowerView: View {
     var body: some View {
         ZStack {
             let placements = placements
-            ForEach(Array(placements.enumerated()), id: \.offset) { index, placement in
+            ForEach(Array(placements.enumerated()).filter { !missingPetals.contains($0.offset) }, id: \.offset) { index, placement in
                 let length = size / 2 * placement.scale
                 let angle = isOpen ? placement.angle : placements[0].angle
                 // Each petal is laid on top of the one before, so sits a little higher.
@@ -213,8 +215,23 @@ struct PlantView: View {
     let size: CGFloat
     /// Resting: faded paper, the stem bent over and the head hanging down.
     var isWilted = false
+    /// Petals the wind blew off (see `Sill.missingPetals(for:)`).
+    var missingPetals: Set<Int> = []
+    /// Degrees the stem and head lean right in a gust, pivoting where the stem meets
+    /// the pot. The pot itself stays put.
+    var lean: Double = 0
 
     private var height: CGFloat { size * 1.76 }
+
+    /// The two layers the plant is drawn in, so the stem can lean while the pot stays still.
+    private enum Layer { case stem, pot }
+
+    /// Where the stem meets the pot rim, as a point in the frame: the lean's pivot.
+    private var stemBase: UnitPoint {
+        let unit = size * 0.38
+        let rimTop = height - potShape(unit: unit).height - unit * 0.16 * 0.6
+        return UnitPoint(x: 0.5, y: rimTop / height)
+    }
 
     /// Which way a wilted head hangs (the same way every time for each owner).
     private var droopSide: CGFloat {
@@ -228,24 +245,32 @@ struct PlantView: View {
     }
 
     var body: some View {
-        Canvas { context, canvasSize in
-            drawStemAndPot(in: &context, width: canvasSize.width)
+        ZStack(alignment: .top) {
+            ZStack(alignment: .top) {
+                Canvas { context, canvasSize in
+                    drawStemAndPot(in: &context, width: canvasSize.width, layer: .stem)
+                }
+                FlowerView(petal: petal, size: size, missingPetals: missingPetals)
+                    .scaleEffect(isWilted ? 0.88 : 1)
+                    .rotationEffect(.degrees(isWilted ? Double(droopSide) * 55 : 0))
+                    .offset(headDrop)
+            }
+            .rotationEffect(.degrees(lean), anchor: stemBase)
+            Canvas { context, canvasSize in
+                drawStemAndPot(in: &context, width: canvasSize.width, layer: .pot)
+            }
         }
         .frame(width: size, height: height)
-        .overlay(alignment: .top) {
-            FlowerView(petal: petal, size: size)
-                .scaleEffect(isWilted ? 0.88 : 1)
-                .rotationEffect(.degrees(isWilted ? Double(droopSide) * 55 : 0))
-                .offset(headDrop)
-        }
         // Faded paper, never see-through.
         .saturation(isWilted ? 0.25 : 1)
     }
 
     /// Stem, leaves, then pot body and rim, each with a hard shadow set by how high it sits.
-    private func drawStemAndPot(in context: inout GraphicsContext, width: CGFloat) {
+    /// Both layers run all of this (so the random numbers line up) but only paint their own pieces.
+    private func drawStemAndPot(in context: inout GraphicsContext, width: CGFloat, layer: Layer) {
         var random = SeededRandom(petal.owner + "-plant")
-        func paper(_ path: Path, _ colour: Color, lift: CGFloat) {
+        func paper(_ path: Path, _ colour: Color, lift: CGFloat, on part: Layer) {
+            guard part == layer else { return }
             let shadow = PaperShadow.offset(lift: lift, unit: size * 0.02)
             context.fill(path.offsetBy(dx: shadow.width, dy: shadow.height), with: .color(PaperShadow.colour(lift: lift)))
             context.fill(path, with: .color(colour))
@@ -284,14 +309,14 @@ struct PlantView: View {
                 CGPoint(x: headCentre.x - stemWidth / 2, y: headCentre.y + stemWidth / 2),
                 CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y + stemWidth / 2),
             ], random: &edges)
-            paper(bend, .mat, lift: 0.7)
+            paper(bend, .mat, lift: 0.7, on: .stem)
         }
         paper(cut([
             CGPoint(x: stemTop.x - stemWidth / 2, y: stemTop.y),
             CGPoint(x: stemTop.x + stemWidth / 2, y: stemTop.y),
             CGPoint(x: stemBottom.x + stemWidth * 0.6, y: stemBottom.y),
             CGPoint(x: stemBottom.x - stemWidth * 0.6, y: stemBottom.y),
-        ]), .mat, lift: 0.7)
+        ]), .mat, lift: 0.7, on: .stem)
 
         // Leaves: the first on a random side, the optional second on the other side, higher up.
         let leafCount = random.next() < 0.5 ? 1 : 2
@@ -307,12 +332,14 @@ struct PlantView: View {
             let place = CGAffineTransform(rotationAngle: angle)
                 .concatenating(CGAffineTransform(translationX: attach.x, y: attach.y))
             let leafRect = CGRect(x: -length / 2, y: -length, width: length, height: length)
-            paper(PetalPath(points: Self.leafHalf).path(in: leafRect).applying(place), .mat, lift: 0.9)
+            paper(PetalPath(points: Self.leafHalf).path(in: leafRect).applying(place), .mat, lift: 0.9, on: .stem)
 
             var crease = Path()
             crease.move(to: CGPoint(x: 0, y: -length * 0.08))
             crease.addLine(to: CGPoint(x: 0, y: -length * 0.85))
-            context.stroke(crease.applying(place), with: .color(.cream.opacity(0.3)), lineWidth: max(0.5, size * 0.006))
+            if layer == .stem {
+                context.stroke(crease.applying(place), with: .color(.cream.opacity(0.3)), lineWidth: max(0.5, size * 0.006))
+            }
         }
 
         // Pot body.
@@ -330,9 +357,9 @@ struct PlantView: View {
             outline.append(CGPoint(x: centreX + bottomHalf, y: bottom))
         }
         outline.append(CGPoint(x: centreX + topHalf, y: bodyTop))
-        paper(cut(outline), shape.body, lift: 1)
+        paper(cut(outline), shape.body, lift: 1, on: .pot)
 
-        if pot == .tin {
+        if pot == .tin, layer == .pot {
             // Pressed ridges round the tin.
             for step in 1...3 {
                 let y = bodyTop + shape.height * Double(step) / 4
@@ -351,7 +378,7 @@ struct PlantView: View {
             CGPoint(x: centreX + rimHalf, y: rimTop - tilt),
             CGPoint(x: centreX + rimHalf, y: rimTop + rimHeight - tilt),
             CGPoint(x: centreX - rimHalf, y: rimTop + rimHeight + tilt),
-        ]), shape.rim, lift: 1.3)
+        ]), shape.rim, lift: 1.3, on: .pot)
     }
 
     /// Widths, height and colours for each pot, in multiples of `unit`.
@@ -388,21 +415,60 @@ struct NameLabel: View {
     }
 }
 
-/// Every friend's plant in the window, drawn live (in the app).
-/// The widget shows the same window with the plants as pre-rendered images.
+/// Every friend's plant in the window, drawn live (in the app), and where a gust
+/// plays: flowers lean right one after another (40 ms apart, 0.45 s in, 0.45 s held,
+/// then a spring back), the curtains billow, and 1–2 petals blow off onto the sill.
+/// With Reduce Motion nothing leans; the fallen petals just fade in.
+/// The widget shows the same window, settled, with the plants as pre-rendered images.
 struct SillView: View {
     let sill: Sill
     var plantSize: CGFloat = 80
     /// The moment being shown; decides who has wilted.
     var now = Date.now
+    /// Bumped to play the last gust.
+    var gustPlays = 0
+    /// 1 for a live gust; `Gust.catchUpSpeed` for one that blew while the app was closed.
+    var gustSpeed = 1.0
+
+    /// False from the start of a gust until its petals land.
+    @State private var isSettled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        WindowScene(sill: sill, now: now) { index, petal in
-            PlantView(petal: petal, pot: .forSill(sill.joinRank(of: petal.owner)), size: plantSize,
-                      isWilted: petal.isWilted(at: now))
+        // With motion, the newest petals fly in during the gust; with Reduce Motion they fade in after it.
+        WindowScene(sill: sill, now: now, showFallen: reduceMotion ? isSettled : true,
+                    gustPlays: reduceMotion ? 0 : gustPlays, gustSpeed: gustSpeed,
+                    flowerHeadHeight: plantSize * 1.26) { index, petal in
+            KeyframeAnimator(initialValue: 0.0, trigger: reduceMotion ? 0 : gustPlays) { lean in
+                PlantView(petal: petal, pot: .forSill(sill.joinRank(of: petal.owner)), size: plantSize,
+                          isWilted: petal.isWilted(at: now),
+                          // The newest gust's petals stay on until it's blown.
+                          missingPetals: sill.missingPetals(for: petal, exceptNewest: !isSettled),
+                          lean: lean)
+            } keyframes: { _ in
+                let lean = sill.gust?.lean(for: petal.owner) ?? 0
+                // Left to right, 40 ms apart.
+                LinearKeyframe(0, duration: max(0.001, Double(index) * 0.04 / gustSpeed))
+                LinearKeyframe(lean, duration: 0.45 / gustSpeed, timingCurve: Gust.leanCurve)
+                LinearKeyframe(lean, duration: 0.45 / gustSpeed)
+                SpringKeyframe(0, duration: 1.4 / gustSpeed, spring: Gust.springBack(speed: gustSpeed))
+            }
         }
         // Room for the plants plus some window above them.
         .frame(height: plantSize * 2.6 + 26)
+        .onChange(of: gustPlays) {
+            isSettled = false
+            Task {
+                // The petals let go at the height of the lean and land on the sill.
+                if reduceMotion {
+                    withAnimation(.easeIn(duration: 0.2)) { isSettled = true }
+                } else {
+                    try? await Task.sleep(for: .seconds(Gust.releaseDelay(flowers: sill.petals.count, speed: gustSpeed)))
+                    // The petal leaves the flower in the same instant it starts to fly.
+                    isSettled = true
+                }
+            }
+        }
     }
 }
 

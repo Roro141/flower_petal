@@ -27,7 +27,11 @@ Done (milestone 4, accounts): Sign in with Apple, windowsills of up to 6, invite
 
 Done (milestone 5, widget push): planting sends a WidgetKit push to friends' widgets through the `widget-push` Edge Function; timeline reloads stay as the fallback.
 
-Not done: wind, Mac.
+Done (milestone 6, wind): random gusts a few times a day; flowers lean, curtains billow, petals fly onto the sill and add up.
+
+Before real use: remove the test gust (long-press + `test_gust`), set `Petal.wiltsAfter` back to 2 days, remove "try without apple" and switch anonymous sign-ins off.
+
+Not done: Mac.
 
 ## Working rules
 
@@ -220,7 +224,7 @@ Steps:
 
 Done when a new petal usually shows on a friend's widget within a minute or two.
 
-## Milestone 6: wind
+## Milestone 6: wind (done)
 
 - Trigger: a server-side event per group, at random a few times a day (decided). Needs a scheduled job in Supabase.
 - In the app (garden screen):
@@ -231,6 +235,14 @@ Done when a new petal usually shows on a friend's widget within a minute or two.
   - With Reduce Motion on: no lean, and fallen petals fade in over 0.2 s.
 - Widgets: never show a lean. After a gust, the next timeline entry shows 1–2 fallen petals on the sill.
 - A gust you missed while the app was closed replays once when you open it, compressed to 1.2 s.
+
+Steps:
+1. [x] `004_wind.sql`: `gusts` table (members can read), `maybe_gust()` every 30 min via pg_cron (7.5% per windowsill, about 3–4 a day), TEMPORARY `test_gust()`.
+2. [x] Gust model: the seed picks 1–2 flowers that each lose a petal (same on every phone); the petal lies on the sill by its pot until the next gust; a flower planted after the gust is whole.
+3. [x] App: lean 10–22° (40 ms stagger, 0.45 s ease-out, 0.45 s hold, spring 0.9/0.55), curtains billow, petals land after the lean; Reduce Motion fades them in over 0.2 s. A missed gust replays once at 1.8× (about 1.2 s). The app checks every minute while open. Long-press the window in Xcode builds for a test gust.
+4. [x] Widget: settled state only (gap in the flower, petal on the sill); `widget-push` also pushes on gusts.
+5. [x] Setup by hand: run `004_wind.sql`, redeploy `widget-push` with the new code, add a `gust-blew` webhook on `gusts` inserts.
+6. [x] Tested on the phone. Follow-ups from testing: everything sways one way (left to right); gusts add up (each takes a petal the flower still has, at least 2 always stay, the sill shows every lost petal); blown-off petals fly to the sill.
 
 ## Milestone 7: Mac
 

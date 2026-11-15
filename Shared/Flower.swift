@@ -7,15 +7,58 @@ struct Member: Codable, Hashable, Sendable {
     var joinedAt: Date?
 }
 
+/// A gust of wind through the windowsill. `seed` decides who loses a petal,
+/// which one, and where it lands, so every phone shows the same gust.
+struct Gust: Codable, Hashable, Sendable {
+    let id: Int
+    let seed: Int
+    let createdAt: Date
+}
+
+extension Gust {
+    /// The design's ease-out for the lean: cubic-bezier(.2, .8, .2, 1).
+    static let leanCurve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.2, y: 0.8),
+                                            endControlPoint: UnitPoint(x: 0.2, y: 1))
+
+    /// The spring back after the hold (response 0.9, damping 0.55), sped up for replays.
+    static func springBack(speed: Double) -> Spring {
+        Spring(response: 0.9 / speed, dampingRatio: 0.55)
+    }
+
+    /// A gust that blew while the app was closed replays once at this speed (about 1.2 s).
+    static let catchUpSpeed = 1.8
+
+    /// When the petals let go: at the height of the lean, once every flower has started
+    /// leaning (they go 40 ms apart).
+    static func releaseDelay(flowers: Int, speed: Double) -> Double {
+        (0.45 + Double(flowers) * 0.04) / speed
+    }
+
+    /// How long a blown-off petal is in the air, from the flower to the sill.
+    static let flightTime = 0.9
+
+    /// How far a flower leans to the right in this gust: 10–22°, different for each.
+    func lean(for owner: String) -> Double {
+        var random = SeededRandom("\(owner)-\(id)-lean")
+        return 10 + random.next() * 12
+    }
+}
+
 /// Everything the window shows: who is on this windowsill, in sill order (me
 /// first, then friends in the order they joined), and each person's latest petal,
-/// in the same order.
-struct Sill: Codable, Sendable {
+/// in the same order, plus the last gust (whose fallen petals lie on the sill).
+struct Sill: Codable, Equatable, Sendable {
     var groupID: String
     var inviteCode: String
     var myID: String
     var members: [Member]
     var petals: [Petal]
+    /// Recent gusts, oldest first. Petals they blew off stay off (and on the sill)
+    /// until the flower's owner plants a new one.
+    var gusts: [Gust] = []
+
+    /// The newest gust: the one that plays when it's new to this phone.
+    var gust: Gust? { gusts.last }
 
     func name(for owner: String) -> String {
         members.first { $0.id == owner }?.name ?? ""
@@ -52,6 +95,50 @@ struct Sill: Codable, Sendable {
             return Petal(id: -(index + 1), owner: member.id, pattern: sample.pattern,
                          nPetals: sample.nPetals, points: sample.points)
         }
+    }
+
+    /// Whose flowers a gust hits (one or two of them, different people) and which
+    /// petal it aims for on each. Picked from the gust's seed, so every phone agrees.
+    func aims(of gust: Gust) -> [(owner: String, petal: Int)] {
+        var random = SeededRandom(seed: UInt64(truncatingIfNeeded: gust.seed))
+        var owners = Self.joinOrder(members).map(\.id)
+        let count = min(owners.count, random.next() < 0.5 ? 1 : 2)
+        return (0..<count).map { _ in
+            let owner = owners.remove(at: Int(random.next() * Double(owners.count)))
+            return (owner: owner, petal: Int(random.next() * 8))
+        }
+    }
+
+    /// A flower never loses more than this many fewer than it was cut with, so it's
+    /// always still a flower (at least two petals).
+    private static let petalsKept = 2
+
+    /// Every petal the wind has taken from each flower since it was planted, oldest
+    /// first, and the gust that took it. Gusts add up: each takes a petal the flower
+    /// still has. These are also the petals lying on the sill.
+    var windLosses: [String: [(petal: Int, gust: Gust)]] {
+        var losses: [String: [(petal: Int, gust: Gust)]] = [:]
+        for gust in gusts {
+            for aim in aims(of: gust) {
+                guard let flower = petals.first(where: { $0.owner == aim.owner }) else { continue }
+                // A flower planted after this gust wasn't there to lose anything.
+                if let planted = flower.createdAt, planted > gust.createdAt { continue }
+                let count = min(max(flower.nPetals, 5), 8)
+                let taken = Set((losses[aim.owner] ?? []).map(\.petal))
+                guard taken.count < count - Self.petalsKept else { continue }
+                // The petal it aimed for, or the next one round that's still there.
+                let index = (0..<count).map { (aim.petal + $0) % count }.first { !taken.contains($0) } ?? 0
+                losses[aim.owner, default: []].append((petal: index, gust: gust))
+            }
+        }
+        return losses
+    }
+
+    /// The petals missing from this flower. `exceptNewest` leaves out the newest gust's,
+    /// for while that gust is still blowing.
+    func missingPetals(for petal: Petal, exceptNewest: Bool = false) -> Set<Int> {
+        let losses = (windLosses[petal.owner] ?? []).filter { !(exceptNewest && $0.gust == gust) }
+        return Set(losses.map(\.petal))
     }
 
     /// Two made-up friends, for previews and the widget gallery.
