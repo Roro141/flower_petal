@@ -182,6 +182,8 @@ struct CentreView: View {
                 }
             }
         case .star:
+            // An ink edge so the cream star still reads on pale (yellow, cream) petals.
+            context.stroke(outlinePath(radius: radius), with: .color(.ink.opacity(0.55)), lineWidth: max(0.75, radius * 0.06))
             context.fill(dot(0, 0, radius * 0.15), with: .color(.ink))
         case .kraft:
             // A few paper fibres.

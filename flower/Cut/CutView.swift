@@ -142,7 +142,7 @@ struct CutView: View {
                     cut.clear()
                     withAnimation(Self.pageTurn) { unfolding = nil }
                 },
-                onPlant: { onPlant(petal) }
+                onPlant: { flower in onPlant(flower) }
             )
             .transition(.opacity)
         } else {
@@ -414,18 +414,9 @@ private struct UndoTab: View {
 
     var body: some View {
         Button(action: onUndo) {
-            Text("undo")
-                .font(Fonts.button())
-                .foregroundStyle(Color.ink)
-                .padding(.horizontal, 22)
-                .frame(minHeight: 44)
-                .background {
-                    TapeShape().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
-                    TapeShape().fill(Color.wall)
-                }
+            TapeLabel(text: "undo")
         }
         .buttonStyle(.plain)
-        .rotationEffect(.degrees(-3))
         .opacity(isEnabled ? 1 : 0.5)
         .disabled(!isEnabled)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in onClear() })
@@ -434,7 +425,27 @@ private struct UndoTab: View {
 }
 
 /// A strip of tape with torn zigzag ends.
-private struct TapeShape: Shape {
+/// A word on a strip of masking tape (undo, invite).
+struct TapeLabel: View {
+    let text: String
+    var tilt: Double = -3
+
+    var body: some View {
+        Text(text)
+            .font(Fonts.button())
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 22)
+            .frame(minHeight: 44)
+            .fixedSize(horizontal: false, vertical: true)
+            .background {
+                TapeShape().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
+                TapeShape().fill(Color.wall)
+            }
+            .rotationEffect(.degrees(tilt))
+    }
+}
+
+struct TapeShape: Shape {
     func path(in rect: CGRect) -> Path {
         let teeth = 5
         let depth: CGFloat = 4

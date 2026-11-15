@@ -57,31 +57,35 @@ struct ContentView: View {
     }
 
     private var window: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 0) {
             HStack {
                 Spacer()
                 if let url = sill?.inviteURL {
                     ShareLink(item: url) {
-                        Text("invite")
-                            .font(Fonts.button())
-                            .foregroundStyle(Color.ink)
-                            .frame(minWidth: 44, minHeight: 44)
+                        TapeLabel(text: "invite", tilt: 4)
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             Spacer()
             if let sill {
                 // Redrawn every minute so a flower wilts on screen when its time comes.
                 TimelineView(.everyMinute) { context in
-                    SillView(sill: sill, plantSize: 80, now: context.date)
+                    SillView(sill: sill, plantSize: 96, now: context.date)
                 }
             }
+            Spacer()
             TicketButton("cut") { isCutting = true }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.wall)
+        .background {
+            // The wall, with the same grain as the window (which has its own).
+            Color.wall.ignoresSafeArea()
+            PaperGrain().ignoresSafeArea()
+        }
         .fullScreenCover(isPresented: $isCutting) {
             CutView(owner: sill?.myID ?? "", paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
                 isCutting = false
