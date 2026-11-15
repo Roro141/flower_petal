@@ -42,17 +42,16 @@ private struct WindowBackdrop: View {
         Canvas { context, size in
             // A fixed seed: the same small misalignments on every render and device.
             var random = SeededRandom(seed: 21)
+            // Edge wobble gets its own numbers, so it never moves the pieces themselves.
+            var edges = SeededRandom(seed: 22)
             func jitter(_ amount: CGFloat) -> CGFloat { (random.next() - 0.5) * 2 * amount }
 
             /// A rectangle cut by hand: each corner nudged a little.
             func cut(_ rect: CGRect, wobble: CGFloat = 1.5) -> Path {
-                var path = Path()
-                path.move(to: CGPoint(x: rect.minX + jitter(wobble), y: rect.minY + jitter(wobble)))
-                path.addLine(to: CGPoint(x: rect.maxX + jitter(wobble), y: rect.minY + jitter(wobble)))
-                path.addLine(to: CGPoint(x: rect.maxX + jitter(wobble), y: rect.maxY + jitter(wobble)))
-                path.addLine(to: CGPoint(x: rect.minX + jitter(wobble), y: rect.maxY + jitter(wobble)))
-                path.closeSubpath()
-                return path
+                let corners = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+                               CGPoint(x: rect.maxX, y: rect.maxY), CGPoint(x: rect.minX, y: rect.maxY)]
+                let nudged = corners.map { CGPoint(x: $0.x + jitter(wobble), y: $0.y + jitter(wobble)) }
+                return RoughEdge.path(through: nudged, random: &edges)
             }
 
             /// A paper piece with a hard shadow; `lift` is how far it sits off what's behind.
@@ -86,10 +85,13 @@ private struct WindowBackdrop: View {
 
             // Curtains: the left one hangs longer than the right.
             let top = window.minY - strip * 0.2
-            piece(curtain(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
-                          length: window.height * 0.74, flaresLeft: true), .cream, lift: 1.4)
-            piece(curtain(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top, width: window.width * 0.2,
-                          length: window.height * 0.56, flaresLeft: false), .cream, lift: 1.4)
+            piece(RoughEdge.path(through: curtain(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
+                                                  length: window.height * 0.74, flaresLeft: true), random: &edges),
+                  .cream, lift: 1.4)
+            piece(RoughEdge.path(through: curtain(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top,
+                                                  width: window.width * 0.2, length: window.height * 0.56,
+                                                  flaresLeft: false), random: &edges),
+                  .cream, lift: 1.4)
             for line in curtainFolds(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
                                      length: window.height * 0.74) +
                         curtainFolds(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top,
@@ -110,23 +112,19 @@ private struct WindowBackdrop: View {
 
     /// A hanging curtain: straight along the rod, flaring a little towards the wall,
     /// with a snipped zigzag hem.
-    private func curtain(x: CGFloat, top: CGFloat, width: CGFloat, length: CGFloat, flaresLeft: Bool) -> Path {
+    private func curtain(x: CGFloat, top: CGFloat, width: CGFloat, length: CGFloat, flaresLeft: Bool) -> [CGPoint] {
         let flare = width * 0.12
         let bottomLeft = x - (flaresLeft ? flare : -flare * 0.3)
         let bottomRight = x + width + (flaresLeft ? -flare * 0.3 : flare)
-        var path = Path()
-        path.move(to: CGPoint(x: x, y: top))
-        path.addLine(to: CGPoint(x: x + width, y: top))
-        path.addLine(to: CGPoint(x: bottomRight, y: top + length))
+        var points = [CGPoint(x: x, y: top), CGPoint(x: x + width, y: top), CGPoint(x: bottomRight, y: top + length)]
         // Hem: right to left, every other point snipped 4 pt lower.
-        let points = 12
-        for index in 1...points {
-            let t = CGFloat(index) / CGFloat(points)
+        let hemPoints = 12
+        for index in 1...hemPoints {
+            let t = CGFloat(index) / CGFloat(hemPoints)
             let dip: CGFloat = index.isMultiple(of: 2) ? 0 : 4
-            path.addLine(to: CGPoint(x: bottomRight + (bottomLeft - bottomRight) * t, y: top + length + dip))
+            points.append(CGPoint(x: bottomRight + (bottomLeft - bottomRight) * t, y: top + length + dip))
         }
-        path.closeSubpath()
-        return path
+        return points
     }
 
     /// Faint vertical folds down a curtain.

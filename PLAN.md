@@ -166,7 +166,7 @@ Done when:
 Steps:
 1. [x] Window scene as cut-paper pieces (wall, sky, slightly misaligned frame strips, uneven curtains, sill board), shared by the app sill and the widget. Pots sit on the sill board, names under them.
 2. [x] Fonts from Google Fonts. Chosen: Indie Flower for names, labels and titles. Bundle a few candidates (with Special Elite and Atkinson Hyperlegible) behind one switch so they're easy to swap and compare.
-3. [ ] Irregular edges: 0.5–1.5 px noise on every clip path (petals, leaves, pots, scene pieces), pattern untouched.
+3. [x] Irregular edges: 0.5–1.5 px noise on every clip path (petals, leaves, pots, scene pieces), pattern untouched.
 4. [ ] Paper grain overlay (3–5%) and cast shadows that vary with each piece's height.
 5. [—] Scanned textures: skipped. Decision: keep the code-drawn papers.
 6. [ ] Resting friend: desaturated paper, drooped head (needs a rule for when someone is "resting").

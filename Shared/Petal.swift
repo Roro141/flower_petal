@@ -68,7 +68,8 @@ struct PetalPath: Shape {
         return softenedPolygon(polygon)
     }
 
-    /// Straight edges, with each corner replaced by a short quadratic curve.
+    /// Straight edges with each corner softened by a short curve, then given a
+    /// hand-cut wobble (see `RoughEdge`). Seeded from the shape, so it never changes.
     private func softenedPolygon(_ vertices: [CGPoint]) -> Path {
         let count = vertices.count
         func lerp(_ a: CGPoint, _ b: CGPoint, _ t: Double) -> CGPoint {
@@ -78,14 +79,19 @@ struct PetalPath: Shape {
         let entries = vertices.indices.map { lerp(vertices[$0], vertices[($0 + count - 1) % count], softness) }
         let exits = vertices.indices.map { lerp(vertices[$0], vertices[($0 + 1) % count], softness) }
 
-        var path = Path()
-        path.move(to: entries[0])
+        // Trace the outline as points: a few along each corner curve; the straight
+        // runs between corners are left to RoughEdge to break up.
+        var outline: [CGPoint] = []
         for index in vertices.indices {
-            path.addQuadCurve(to: exits[index], control: vertices[index])
-            path.addLine(to: entries[(index + 1) % count])
+            for step in 0...3 {
+                let t = Double(step) / 3
+                let a = lerp(entries[index], vertices[index], t)
+                let b = lerp(vertices[index], exits[index], t)
+                outline.append(lerp(a, b, t))
+            }
         }
-        path.closeSubpath()
-        return path
+        var random = SeededRandom("\(points)")
+        return RoughEdge.path(through: outline, random: &random)
     }
 }
 

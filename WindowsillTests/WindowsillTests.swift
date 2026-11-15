@@ -12,9 +12,21 @@ struct WindowsillTests {
         for shape in Petal.sampleShapes {
             let bounds = PetalPath(points: shape).path(in: rect).boundingRect
             #expect(!bounds.isEmpty)
-            // Mirrored halves: as far left of the fold as right of it.
-            #expect(abs((bounds.midX) - rect.midX) < 0.5)
+            // Mirrored halves: as far left of the fold as right of it (give or
+            // take the hand-cut wobble, which is at most 0.75 pt).
+            #expect(abs(bounds.midX - rect.midX) < 2)
         }
+    }
+
+    @Test func roughEdgeStaysCloseToTheLineAndRepeats() {
+        let square = [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 100), CGPoint(x: 0, y: 100)]
+        var first = SeededRandom(seed: 4)
+        var second = SeededRandom(seed: 4)
+        let path = RoughEdge.path(through: square, random: &first)
+        #expect(path == RoughEdge.path(through: square, random: &second))
+        // Never more than 0.75 pt off the square's edges.
+        #expect(CGRect(x: -0.75, y: -0.75, width: 101.5, height: 101.5).contains(path.boundingRect))
+        #expect(path.boundingRect.contains(CGRect(x: 0.75, y: 0.75, width: 98.5, height: 98.5)))
     }
 
     @Test func petalPathIgnoresTooFewPoints() {

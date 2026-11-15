@@ -226,15 +226,14 @@ struct PlantView: View {
             context.fill(path, with: .color(colour))
         }
         /// Joins points with straight cuts, each nudged a little so no two pots are machine-even.
+        // Edge wobble gets its own numbers, so it never changes the plant's layout.
+        var edges = SeededRandom(petal.owner + "-edges")
         func cut(_ points: [CGPoint]) -> Path {
-            var path = Path()
-            for (index, point) in points.enumerated() {
-                let nudged = CGPoint(x: point.x + (random.next() - 0.5) * size * 0.016,
-                                     y: point.y + (random.next() - 0.5) * size * 0.016)
-                index == 0 ? path.move(to: nudged) : path.addLine(to: nudged)
+            let nudged = points.map { point in
+                CGPoint(x: point.x + (random.next() - 0.5) * size * 0.016,
+                        y: point.y + (random.next() - 0.5) * size * 0.016)
             }
-            path.closeSubpath()
-            return path
+            return RoughEdge.path(through: nudged, random: &edges)
         }
 
         let centreX = width / 2
