@@ -18,7 +18,6 @@ struct ContentView: View {
     @State private var sill = FlowerStore.load()
     /// An invite link opened before we were ready to join (signed out, or no name yet).
     @State private var pendingInvite: String?
-    @State private var showingSamples = false
     @State private var isCutting = false
     /// Refreshes run one at a time. One asked for while another is running (e.g. an
     /// invite link arriving during launch) runs straight after it instead.
@@ -60,14 +59,6 @@ struct ContentView: View {
     private var window: some View {
         VStack(spacing: 32) {
             HStack {
-                // Development only: opens the sample plants and fonts.
-                Button { showingSamples = true } label: {
-                    Text("samples")
-                        .font(Fonts.body())
-                        .foregroundStyle(Color.grey)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
                 Spacer()
                 if let url = sill?.inviteURL {
                     ShareLink(item: url) {
@@ -91,7 +82,6 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.wall)
-        .sheet(isPresented: $showingSamples) { SamplesView() }
         .fullScreenCover(isPresented: $isCutting) {
             CutView(owner: sill?.myID ?? "", paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
                 isCutting = false

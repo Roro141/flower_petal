@@ -18,7 +18,8 @@ struct SignInView: View {
                 .foregroundStyle(Color.ink)
             SignInWithAppleButton(.signIn) { request in
                 nonce = Self.randomNonce()
-                request.requestedScopes = [.fullName]
+                // Supabase needs an email to create the account (Apple may hand over a private relay one).
+                request.requestedScopes = [.fullName, .email]
                 request.nonce = Self.sha256(nonce)
             } onCompletion: { result in
                 handle(result)

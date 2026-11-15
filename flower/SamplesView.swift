@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Check screen: the five sample plants side by side, so the variety can be
-/// judged by eye, and every bundled font for comparing (see `Fonts`).
+/// Design check, previews only (not reachable in the app): the five sample plants,
+/// fresh and wilted, and every bundled font for comparing (see `Fonts`).
 struct SamplesView: View {
     var body: some View {
         ScrollView {

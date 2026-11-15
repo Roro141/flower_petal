@@ -21,7 +21,11 @@ Done (milestone 2, the cutting screen):
 
 UI polish is parked on purpose: see [UI-NOTES.md](UI-NOTES.md).
 
-Not done: paper textures, accounts, wind, Mac.
+Done (milestone 3, paper that looks real): window scene, fonts, hand-cut edges, grain and shadows, wilting. Scanned textures skipped on purpose.
+
+Done (milestone 4, accounts): Sign in with Apple, windowsills of up to 6, invite links, row-level security.
+
+Not done: widget push, wind, Mac.
 
 ## Working rules
 
@@ -173,7 +177,7 @@ Steps:
 
 Done when side by side with the mockups on the Windowsill canvas, it reads as paper, not vector art.
 
-## Milestone 4: accounts, groups, invites
+## Milestone 4: accounts, groups, invites (done)
 
 - Sign in with Apple through Supabase Auth.
 - Tables:
@@ -192,7 +196,9 @@ Steps:
 2. [x] Sign in with Apple → Supabase session, stored in the shared keychain so the widget can use it too; refreshed when it expires.
 3. [x] Name, start a windowsill, invite link, join from a link.
 4. [x] Sill from the group: me first, then friends in the order they joined; names from profiles. Widget too. Spike users removed.
-5. [ ] Close the spike table: drop the open test policies on `petals_v2` (second SQL file, run after the new app works).
+5. [x] Close the spike table: drop the open test policies on `petals_v2` (`002_close_spike.sql`, run after the new app works).
+
+Tested: three simulators joined one windowsill through the link (cold launch and while running); a server check with throwaway accounts confirmed outsiders see nothing. A temporary "try without apple" (anonymous) sign-in is still in for multi-device testing; remove it and switch anonymous sign-ins off before real use.
 
 Setup (by hand, once): run `001_accounts_groups.sql` in the SQL Editor; in Authentication → Sign In / Providers → Apple, turn Apple on and add `com.RohaF.windowsill` under Client IDs.
 
