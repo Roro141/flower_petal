@@ -29,7 +29,7 @@ struct TicketButton: View {
     var body: some View {
         Button(action: press) {
             Text(title)
-                .font(.system(size: 15, weight: .bold))
+                .font(Fonts.button())
                 .foregroundStyle(isPrimary ? Color.cream : Color.ink)
                 .padding(.horizontal, 18)
                 .frame(minHeight: 44)

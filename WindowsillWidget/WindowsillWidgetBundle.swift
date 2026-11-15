@@ -10,6 +10,10 @@ import SwiftUI
 
 @main
 struct WindowsillWidgetBundle: WidgetBundle {
+    init() {
+        Fonts.register()
+    }
+
     var body: some Widget {
         WindowsillWidget()
     }

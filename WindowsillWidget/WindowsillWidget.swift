@@ -55,31 +55,20 @@ struct SillEntry: TimelineEntry {
     let petals: [Petal]
 }
 
-/// The sill as static images: each plant is a PNG drawn by `FlowerRenderer`.
+/// The window as a static snapshot: the scene is drawn here, but every plant is
+/// a PNG drawn earlier by `FlowerRenderer`.
 struct WindowsillWidgetEntryView: View {
     var entry: Provider.Entry
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .bottom, spacing: 8) {
-                ForEach(Array(entry.petals.enumerated()), id: \.element.id) { index, petal in
-                    VStack(spacing: 2) {
-                        if let image = FlowerRenderer.image(for: petal, sillIndex: index) {
-                            Image(decorative: image, scale: FlowerRenderer.scale)
-                                .resizable()
-                                .scaledToFit()
-                        } else {
-                            Color.clear
-                        }
-                        NameLabel(owner: petal.owner)
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
-                }
+        WindowScene(petals: entry.petals, boardHeight: 20, plantSpacing: 6, plantsTopInset: 22) { index, petal in
+            if let image = FlowerRenderer.image(for: petal, sillIndex: index) {
+                Image(decorative: image, scale: FlowerRenderer.scale)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Color.clear
             }
-            Rectangle()
-                .fill(Color.sill)
-                .frame(height: 6)
         }
     }
 }
@@ -92,6 +81,8 @@ struct WindowsillWidget: Widget {
             WindowsillWidgetEntryView(entry: entry)
                 .containerBackground(Color.wall, for: .widget)
         }
+        // The window runs to the widget's edges.
+        .contentMarginsDisabled()
         .configurationDisplayName("Windowsill")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

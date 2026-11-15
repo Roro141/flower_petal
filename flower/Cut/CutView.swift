@@ -411,7 +411,7 @@ private struct UndoTab: View {
     var body: some View {
         Button(action: onUndo) {
             Text("undo")
-                .font(.system(size: 15, weight: .bold))
+                .font(Fonts.button())
                 .foregroundStyle(Color.ink)
                 .padding(.horizontal, 22)
                 .frame(minHeight: 44)

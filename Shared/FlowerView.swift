@@ -344,34 +344,24 @@ struct NameLabel: View {
 
     var body: some View {
         Text(SpikeUsers.name(for: owner))
-            .font(.system(size: 13, design: .monospaced))
+            .font(Fonts.label())
             .foregroundStyle(Color.ink)
             .lineLimit(1)
     }
 }
 
-/// Every friend's plant side by side on one sill, drawn live (in the app).
-/// The widget shows the same plants as pre-rendered images instead.
+/// Every friend's plant in the window, drawn live (in the app).
+/// The widget shows the same window with the plants as pre-rendered images.
 struct SillView: View {
     let petals: [Petal]
     var plantSize: CGFloat = 80
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .bottom, spacing: 16) {
-                ForEach(Array(petals.enumerated()), id: \.element.id) { index, petal in
-                    VStack(spacing: 4) {
-                        PlantView(petal: petal, pot: .forSill(index), size: plantSize)
-                        NameLabel(owner: petal.owner)
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(SpikeUsers.name(for: petal.owner))'s flower")
-                }
-            }
-            Rectangle()
-                .fill(Color.sill)
-                .frame(height: 8)
+        WindowScene(petals: petals) { index, petal in
+            PlantView(petal: petal, pot: .forSill(index), size: plantSize)
         }
+        // Room for the plants plus some window above them.
+        .frame(height: plantSize * 2.6 + 26)
     }
 }
 

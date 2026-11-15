@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Milestone 1 check screen: the five sample plants side by side, so the
-/// variety can be judged by eye.
+/// Check screen: the five sample plants side by side, so the variety can be
+/// judged by eye, and every bundled font for comparing (see `Fonts`).
 struct SamplesView: View {
     var body: some View {
         ScrollView {
@@ -11,6 +11,20 @@ struct SamplesView: View {
                 }
             }
             .padding(24)
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(Typeface.allCases, id: \.self) { typeface in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("roha  junie  plant it")
+                            .font(.custom(typeface.rawValue, size: 20))
+                        Text(typeface.rawValue)
+                            .font(.custom(typeface.rawValue, size: 13))
+                            .foregroundStyle(Color.grey)
+                    }
+                }
+            }
+            .foregroundStyle(Color.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.wall)
@@ -19,4 +33,5 @@ struct SamplesView: View {
 
 #Preview {
     SamplesView()
+        .onAppear { Fonts.register() }
 }
