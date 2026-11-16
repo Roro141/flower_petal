@@ -95,12 +95,18 @@ enum Auth {
 /// (so the widget can refresh while the phone is locked).
 private enum SessionKeychain {
     private static var query: [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "windowsill.session",
             kSecAttrAccount as String: "supabase",
             kSecAttrAccessGroup as String: FlowerStore.appGroup,
         ]
+        #if os(macOS)
+        // The Mac only shares keychain items through an access group in the
+        // iOS-style (data protection) keychain.
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        return query
     }
 
     static func load() -> Session? {

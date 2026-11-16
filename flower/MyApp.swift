@@ -16,6 +16,23 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // Always the paper look (wall, cream, ink), matching the widget, even
+                // when the phone or Mac is in dark mode.
+                .preferredColorScheme(.light)
         }
+        #if os(macOS)
+        .defaultSize(width: 520, height: 760)
+        #endif
+        #if os(macOS)
+        // The window scene in the menu bar, with the wind playing in full.
+        MenuBarExtra {
+            SillPanel()
+                .preferredColorScheme(.light)
+        } label: {
+            Image(nsImage: MenuBarFlower.image)
+                .accessibilityLabel("Windowsill")
+        }
+        .menuBarExtraStyle(.window)
+        #endif
     }
 }

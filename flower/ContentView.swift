@@ -108,12 +108,22 @@ struct ContentView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active { Task { await refresh() } }
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $isCutting) {
             CutView(owner: sill?.myID ?? "", paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
                 isCutting = false
                 plant(petal)
             })
         }
+        #else
+        // On the Mac, cutting is point-and-click in its own window-sized sheet.
+        .sheet(isPresented: $isCutting) {
+            MacCutView(owner: sill?.myID ?? "", onCancel: { isCutting = false }, onPlant: { petal in
+                isCutting = false
+                plant(petal)
+            })
+        }
+        #endif
     }
 
     // MARK: - Steps
@@ -171,11 +181,8 @@ struct ContentView: View {
     /// Plays the last gust if this phone hasn't shown it yet: at full speed if it just
     /// blew, otherwise once, compressed, as a catch-up.
     private func playNewGust() {
-        guard let gust = sill?.gust else { return }
-        let defaults = UserDefaults.standard
-        guard defaults.integer(forKey: "lastPlayedGust") != gust.id else { return }
-        defaults.set(gust.id, forKey: "lastPlayedGust")
-        gustSpeed = Date.now.timeIntervalSince(gust.createdAt) < 120 ? 1 : Gust.catchUpSpeed
+        guard let speed = Gust.playbackSpeed(for: sill?.gust, seenKey: "lastPlayedGust") else { return }
+        gustSpeed = speed
         gustPlays += 1
     }
 

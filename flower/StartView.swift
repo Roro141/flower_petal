@@ -7,8 +7,10 @@ import os
 struct SignInView: View {
     var onSignedIn: (Session, String?) -> Void
 
-    /// The raw nonce for the request in flight; Apple gets its SHA-256.
-    @State private var nonce = ""
+    /// Every raw nonce handed out, keyed by the SHA-256 that Apple was given. The
+    /// button can ask for a new request more than once per tap (it does on the Mac),
+    /// so the right one is looked up from Apple's reply rather than assumed.
+    @State private var nonces = Nonces()
 
     var body: some View {
         VStack(spacing: 32) {
@@ -17,10 +19,9 @@ struct SignInView: View {
                 .font(Fonts.title())
                 .foregroundStyle(Color.ink)
             SignInWithAppleButton(.signIn) { request in
-                nonce = Self.randomNonce()
                 // Supabase needs an email to create the account (Apple may hand over a private relay one).
                 request.requestedScopes = [.fullName, .email]
-                request.nonce = Self.sha256(nonce)
+                request.nonce = nonces.issue()
             } onCompletion: { result in
                 handle(result)
             }
@@ -61,7 +62,10 @@ struct SignInView: View {
         }
         // Apple only shares the name the first time someone signs in.
         let givenName = credential.fullName?.givenName
-        let rawNonce = nonce
+        guard let rawNonce = nonces.raw(for: idToken) else {
+            PetalService.log.error("sign in with apple: no matching nonce")
+            return
+        }
         Task {
             do {
                 let session = try await Auth.signInWithApple(idToken: idToken, nonce: rawNonce)
@@ -72,13 +76,33 @@ struct SignInView: View {
         }
     }
 
-    private static func randomNonce() -> String {
+}
+
+/// One-time codes for Sign in with Apple. Apple gets the SHA-256 of a random code;
+/// Supabase gets the code itself and checks it matches what Apple signed.
+final class Nonces {
+    private var issued: [String: String] = [:]
+
+    /// A fresh code: returns the hash to give Apple, and remembers the code.
+    func issue() -> String {
         let characters = Array("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        return String((0..<32).compactMap { _ in characters.randomElement() })
+        let raw = String((0..<32).compactMap { _ in characters.randomElement() })
+        let hash = SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
+        issued[hash] = raw
+        return hash
     }
 
-    private static func sha256(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    /// The code behind the hash in Apple's identity token (its `nonce` claim).
+    func raw(for idToken: String) -> String? {
+        let parts = idToken.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        // The token's middle part is base64url JSON.
+        var base64 = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard let data = Data(base64Encoded: base64),
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hash = claims["nonce"] as? String else { return nil }
+        return issued[hash]
     }
 }
 
@@ -96,7 +120,9 @@ struct NameView: View {
                 .font(Fonts.body())
                 .foregroundStyle(Color.ink)
                 .multilineTextAlignment(.center)
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .submitLabel(.done)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: 240, minHeight: 44)

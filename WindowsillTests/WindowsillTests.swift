@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Testing
+import CryptoKit
 @testable import flower
 
 /// Checks for the milestone 1 pieces: petal geometry, stored rows, seeded
@@ -216,6 +217,21 @@ struct WindowsillTests {
         #expect(petal.isWilted(at: planted.addingTimeInterval(Petal.wiltsAfter)))
         // A petal that hasn't been saved yet has no date, so it never wilts.
         #expect(!Petal.samples[0].isWilted(at: .distantFuture))
+    }
+
+    @Test func signInFindsTheNonceAppleActuallyUsed() throws {
+        let nonces = Nonces()
+        let first = nonces.issue()
+        _ = nonces.issue()   // the button asked again; Apple used the first one
+        // A fake identity token whose nonce claim is the first hash.
+        let claims = try JSONSerialization.data(withJSONObject: ["nonce": first, "sub": "x"])
+        let payload = claims.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let token = "header.\(payload).signature"
+        let raw = try #require(nonces.raw(for: token))
+        #expect(SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined() == first)
+        #expect(nonces.raw(for: "not-a-token") == nil)
     }
 
     @Test func randomPetalIsAValidSample() {

@@ -37,6 +37,17 @@ extension Gust {
     /// How long a blown-off petal is in the air, from the flower to the sill.
     static let flightTime = 0.9
 
+    /// If `gust` hasn't been shown in this place yet (`seenKey` names the place: the
+    /// app's window, the Mac's menu-bar panel), marks it shown and returns how fast to
+    /// play it: full speed if it just blew, otherwise once, compressed, as a catch-up.
+    static func playbackSpeed(for gust: Gust?, seenKey: String) -> Double? {
+        guard let gust else { return nil }
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: seenKey) != gust.id else { return nil }
+        defaults.set(gust.id, forKey: seenKey)
+        return Date.now.timeIntervalSince(gust.createdAt) < 120 ? 1 : catchUpSpeed
+    }
+
     /// How far a flower leans to the right in this gust: 10–22°, different for each.
     func lean(for owner: String) -> Double {
         var random = SeededRandom("\(owner)-\(id)-lean")

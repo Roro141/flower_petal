@@ -31,7 +31,9 @@ Done (milestone 6, wind): random gusts a few times a day; flowers lean, curtains
 
 Before real use: remove the test gust (long-press + `test_gust`), set `Petal.wiltsAfter` back to 2 days, remove "try without apple" and switch anonymous sign-ins off.
 
-Not done: Mac.
+Done (milestone 7, Mac): the same app on the Mac, with a desktop widget, a menu-bar panel and a draw-or-click cut window.
+
+All seven milestones are done.
 
 ## Working rules
 
@@ -244,7 +246,7 @@ Steps:
 5. [x] Setup by hand: run `004_wind.sql`, redeploy `widget-push` with the new code, add a `gust-blew` webhook on `gusts` inserts.
 6. [x] Tested on the phone. Follow-ups from testing: everything sways one way (left to right); gusts add up (each takes a petal the flower still has, at least 2 always stay, the sill shows every lost petal); blown-off petals fly to the sill.
 
-## Milestone 7: Mac
+## Milestone 7: Mac (done)
 
 - Add a macOS target to the same multiplatform project and reuse Shared/.
 - Desktop widget: the same window widget as on iOS.
@@ -254,6 +256,13 @@ Steps:
   - click the first point, or press Return, to close the shape
   - Delete removes the last point, Esc cancels
   - paper choices in a side column
+
+Steps:
+1. [x] The app and widget targets were already multiplatform; macOS builds after small fixes (the Mac cut window replaces the full-screen cut; data-protection keychain on the Mac).
+2. [x] `MacCutView`: click points, drag to curve a segment, click the first point or Return to close onto the crease, Delete removes the last point, Esc cancels, papers in a side column. Same `CutShape` and `UnfoldView` as the phone.
+3. [x] `MenuBarExtra` panel (`SillPanel`): the window scene with the full wind animation, refreshed every minute; a template cut-paper flower icon.
+4. [x] Desktop widget: the same widget extension, built for the Mac.
+5. [x] Tested on the Mac: sign in (fixed a nonce mismatch: the button can ask for more than one request per click), menu-bar panel, cutting. Follow-ups: always the light paper look; drag to draw on the Mac too (click still places straight points).
 
 ## Later (not now)
 
