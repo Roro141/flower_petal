@@ -129,14 +129,6 @@ enum PetalService {
                     gusts: gusts.reversed().map { Gust(id: $0.id, seed: $0.seed, createdAt: $0.created_at) })
     }
 
-    /// TEMPORARY, for testing: blows a gust through my windowsill right now.
-    static func testGust(_ session: Session) async throws {
-        var request = makeRequest(path: "rpc/test_gust", session: session)
-        request.httpMethod = "POST"
-        request.httpBody = Data("{}".utf8)
-        try await sendIgnoringBody(request)
-    }
-
     /// Saves this phone's widget push token for me, so friends' new petals can nudge my widget.
     static func saveWidgetToken(_ token: String, environment: String, _ session: Session) async throws {
         var request = makeRequest(path: "rpc/save_widget_token", session: session)

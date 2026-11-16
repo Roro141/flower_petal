@@ -29,7 +29,7 @@ Done (milestone 5, widget push): planting sends a WidgetKit push to friends' wid
 
 Done (milestone 6, wind): random gusts a few times a day; flowers lean, curtains billow, petals fly onto the sill and add up.
 
-Before real use: remove the test gust (long-press + `test_gust`), set `Petal.wiltsAfter` back to 2 days, remove "try without apple" and switch anonymous sign-ins off.
+Cleaned up for real use: test gust removed (`005_before_real_use.sql` drops `test_gust`), `Petal.wiltsAfter` is 2 days, "try without apple" removed and anonymous test accounts deleted; anonymous sign-ins switched off in the dashboard.
 
 Done (milestone 7, Mac): the same app on the Mac, with a desktop widget, a menu-bar panel and a draw-or-click cut window.
 
@@ -267,6 +267,5 @@ Steps:
 ## Later (not now)
 
 - watering
-- the pressed keepsake page
 - Android (Kotlin + Jetpack Glance)
 - App Store submission

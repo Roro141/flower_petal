@@ -26,15 +26,6 @@ enum Auth {
         return session
     }
 
-    /// TEMPORARY, for testing while Sign in with Apple isn't working yet: a Supabase
-    /// anonymous account (needs "Allow anonymous sign-ins" on in the dashboard).
-    /// Remove before real use.
-    static func signInAnonymously() async throws -> Session {
-        let session = try await post(path: "auth/v1/signup", query: nil, body: [:])
-        SessionKeychain.save(session)
-        return session
-    }
-
     /// The saved session, refreshed first if it expires within a minute.
     /// nil when nobody is signed in on this phone.
     static func currentSession() async throws -> Session? {

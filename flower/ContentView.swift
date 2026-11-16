@@ -76,17 +76,9 @@ struct ContentView: View {
             Spacer()
             if let sill {
                 // Redrawn every minute so a flower wilts on screen when its time comes.
-                let window = TimelineView(.everyMinute) { context in
+                TimelineView(.everyMinute) { context in
                     SillView(sill: sill, plantSize: 96, now: context.date, gustPlays: gustPlays, gustSpeed: gustSpeed)
                 }
-                #if DEBUG
-                // TEMPORARY, for testing: a long press on the window blows a gust right now.
-                window.onLongPressGesture(minimumDuration: 0.8) {
-                    Task { await testGust() }
-                }
-                #else
-                window
-                #endif
             }
             Spacer()
             TicketButton("cut") { isCutting = true }
@@ -185,18 +177,6 @@ struct ContentView: View {
         gustSpeed = speed
         gustPlays += 1
     }
-
-    #if DEBUG
-    private func testGust() async {
-        guard let session else { return }
-        do {
-            try await PetalService.testGust(session)
-        } catch {
-            PetalService.log.error("test gust failed: \(error.localizedDescription, privacy: .public)")
-        }
-        await refresh()
-    }
-    #endif
 
     private func saveName(_ name: String) async {
         guard let session else { return }
