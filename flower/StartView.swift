@@ -12,9 +12,21 @@ struct SignInView: View {
     /// so the right one is looked up from Apple's reply rather than assumed.
     @State private var nonces = Nonces()
 
+    private static let welcomeSill: Sill = {
+        let members = ["w1", "w2", "w3"].map { Member(id: $0, name: "") }
+        return Sill(groupID: "", inviteCode: "", myID: "", members: members,
+                    petals: Sill.petals(for: members, latest: []))
+    }()
+
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 28) {
             Spacer()
+            // A windowsill waiting for friends: three flowers, no names yet.
+            WindowScene(sill: Self.welcomeSill) { index, petal in
+                PlantView(petal: petal, pot: .forSill(index), size: 72)
+            }
+            .frame(height: 240)
+            .accessibilityHidden(true)
             Text("windowsill")
                 .font(Fonts.title())
                 .foregroundStyle(Color.ink)
@@ -97,9 +109,20 @@ struct NameView: View {
 
     private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    private var preview: Sill {
+        let me = [Member(id: "me", name: trimmed)]
+        return Sill(groupID: "", inviteCode: "", myID: "me", members: me, petals: Sill.petals(for: me, latest: []))
+    }
+
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 28) {
             Spacer()
+            // Your pot on the sill, with the name you're typing on the board under it.
+            WindowScene(sill: preview) { index, petal in
+                PlantView(petal: petal, pot: .forSill(index), size: 80)
+            }
+            .frame(height: 240)
+            .accessibilityHidden(true)
             TextField("name", text: $name)
                 .font(Fonts.body())
                 .foregroundStyle(Color.ink)

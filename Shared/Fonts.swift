@@ -25,7 +25,8 @@ enum Fonts {
     /// Names under the pots and other small labels. Indie Flower runs small, so 16
     /// here reads about like a 13 pt label (never below 12).
     static func label() -> Font { .custom(handwriting.rawValue, size: 16, relativeTo: .caption) }
-    static func title() -> Font { .custom(handwriting.rawValue, size: 20, relativeTo: .title3) }
+    /// Titles. Indie Flower runs small, so 28 here reads about like a 20 pt title.
+    static func title() -> Font { .custom(handwriting.rawValue, size: 28, relativeTo: .title2) }
     static func body() -> Font { .custom(reading.rawValue, size: 15, relativeTo: .body) }
     static func button() -> Font { .custom(buttons.rawValue, size: 15, relativeTo: .body) }
 

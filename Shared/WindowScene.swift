@@ -169,19 +169,24 @@ private struct WindowBackdrop: View {
                              width: window.width + strip * 2, height: strip)), .wood)
 
             // Curtains: the left one hangs longer than the right.
+            // In a small window (the small widget) they're tied back narrower and shorter,
+            // so they frame the flowers instead of covering them.
+            let tieBack: CGFloat = window.width < 260 ? 0.6 : 1
+            let leftWidth = window.width * 0.24 * tieBack, rightWidth = window.width * 0.2 * tieBack
+            let leftLength = window.height * 0.74 * (tieBack < 1 ? 0.8 : 1)
+            let rightLength = window.height * 0.56 * (tieBack < 1 ? 0.8 : 1)
             let top = window.minY - strip * 0.2
-            piece(RoughEdge.path(through: curtain(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
-                                                  length: window.height * 0.74, flaresLeft: true, billow: billow),
+            piece(RoughEdge.path(through: curtain(x: window.minX - strip * 0.8, top: top, width: leftWidth,
+                                                  length: leftLength, flaresLeft: true, billow: billow),
                                  random: &edges),
                   .cream, lift: 1.4)
-            piece(RoughEdge.path(through: curtain(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top,
-                                                  width: window.width * 0.2, length: window.height * 0.56,
+            piece(RoughEdge.path(through: curtain(x: window.maxX + strip * 0.8 - rightWidth, top: top,
+                                                  width: rightWidth, length: rightLength,
                                                   flaresLeft: false, billow: billow), random: &edges),
                   .cream, lift: 1.4)
-            for line in curtainFolds(x: window.minX - strip * 0.8, top: top, width: window.width * 0.24,
-                                     length: window.height * 0.74) +
-                        curtainFolds(x: window.maxX + strip * 0.8 - window.width * 0.2, top: top,
-                                     width: window.width * 0.2, length: window.height * 0.56) {
+            for line in curtainFolds(x: window.minX - strip * 0.8, top: top, width: leftWidth, length: leftLength) +
+                        curtainFolds(x: window.maxX + strip * 0.8 - rightWidth, top: top,
+                                     width: rightWidth, length: rightLength) {
                 context.stroke(line, with: .color(.ink.opacity(0.08)), lineWidth: 1)
             }
             piece(cut(CGRect(x: window.minX - strip * 1.6, y: top - strip * 0.35,

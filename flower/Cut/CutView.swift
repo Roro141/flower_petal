@@ -318,6 +318,9 @@ private struct PaperFan: View {
                 Button { selection = paper } label: {
                     PaperFill(paper: paper, scale: 6)
                         .frame(width: 40, height: 52)
+                        // The chosen sheet gets a cream border, like a photo corner.
+                        .overlay { Rectangle().strokeBorder(Color.cream, lineWidth: isSelected ? 2.5 : 0) }
+                        .scaleEffect(isSelected ? 1.08 : 1, anchor: .bottom)
                         .background {
                             Rectangle().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
                         }
@@ -348,10 +351,12 @@ private struct PresetTiles: View {
         ("notched", Petal.sampleShapes[2]),
         ("heart", Petal.sampleShapes[4]),
     ]
+    /// Each tile sits a little crooked, as if stuck down by hand.
+    private static let tilts: [Double] = [-3, 2, -1.5, 3.5]
 
     var body: some View {
         HStack(spacing: 14) {
-            ForEach(Self.presets, id: \.name) { preset in
+            ForEach(Array(Self.presets.enumerated()), id: \.element.name) { index, preset in
                 Button { onPick(preset.shape) } label: {
                     PaperFill(paper: paper, scale: 5)
                         .clipShape(PetalPath(points: preset.shape))
@@ -363,6 +368,7 @@ private struct PresetTiles: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .rotationEffect(.degrees(Self.tilts[index]))
                 .accessibilityLabel("\(preset.name) petal")
             }
         }

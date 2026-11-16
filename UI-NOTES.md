@@ -20,6 +20,14 @@ Not happy with the UI yet. Come back to this after the core features work. Nothi
 - Names on the sill bigger (Indie Flower runs small).
 - Star centre has an ink edge so it reads on pale petals.
 
+## Done in the second design pass
+
+- Sign-in screen: a little windowsill with three unnamed flowers above the title, instead of a bare title.
+- Name screen: your flower in the window, with the name you're typing showing up on the sill as you type.
+- Titles bigger (28) so Indie Flower holds its own.
+- Small widget: curtains tied back narrower and shorter so they frame the flowers instead of covering them.
+- Cut screen: the chosen paper in the fan has a cream border and sits a bit bigger; the four ready-made petal tiles sit slightly crooked, as if stuck down by hand.
+
 ## Ideas / notes
 
 - (add here)
