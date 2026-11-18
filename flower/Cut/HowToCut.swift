@@ -41,8 +41,7 @@ struct HowToCut: View {
             Card(title: "Oops?",
                  lines: ["\(tap) undo to take back the last bit.",
                          isMac ? "Let go too soon? Click the end of the line and keep going."
-                               : "Lifted your finger? Put it back on the end of the line and keep going.",
-                         "No time to cut? \(tap) a ready-made petal."]),
+                               : "Lifted your finger? Put it back on the end of the line and keep going."]),
             Card(title: "Make it yours",
                  lines: ["When it's cut, \(tap.lowercased()) cut.",
                          "Edit the details, then \(tap.lowercased()) plant it."]),
@@ -170,22 +169,24 @@ struct HowToCut: View {
                 }
             }
         case 4:
-            // Undo, and the ready-made petals.
-            VStack(spacing: 18) {
-                TapeLabel(text: "undo", tilt: -3)
-                HStack(spacing: 10) {
-                    ForEach([0, 1, 2, 4], id: \.self) { shape in
-                        PaperFill(paper: .dots, scale: 4)
-                            .clipShape(PetalPath(points: Petal.sampleShapes[shape]))
-                            .padding(5)
-                            .frame(width: 40, height: 40)
-                            .background {
-                                Rectangle().fill(Color.ink.opacity(0.3)).offset(x: 2, y: 2)
-                                Rectangle().fill(Color.wall)
-                            }
-                            .rotationEffect(.degrees([-3, 2, -1.5, 3.5][min(shape, 3)]))
+            // Undo, next to a cut that stopped short, with its dashed way back to the fold.
+            HStack(spacing: 24) {
+                ZStack(alignment: .topLeading) {
+                    MiniSheet(size: sheet)
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: sheet.height * 0.8))
+                        path.addQuadCurve(to: CGPoint(x: sheet.width * 0.5, y: sheet.height * 0.42),
+                                          control: CGPoint(x: sheet.width * 0.5, y: sheet.height * 0.75))
                     }
+                    .stroke(Color.ink, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    Path { path in
+                        path.move(to: CGPoint(x: sheet.width * 0.5, y: sheet.height * 0.42))
+                        path.addLine(to: CGPoint(x: 0, y: sheet.height * 0.42))
+                    }
+                    .stroke(Color.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
                 }
+                .frame(width: sheet.width, height: sheet.height)
+                TapeLabel(text: "undo", tilt: -3)
             }
         default:
             // A finished flower and its "plant it" ticket.

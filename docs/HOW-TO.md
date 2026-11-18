@@ -46,31 +46,35 @@ This is your window! Every friend has a flower in a pot, with their name underne
 
 ## 5. Pick your paper
 
+The very first time you tap **cut**, a few little cards show you how it all works. Tap **next** to go through them, or the **×** in the corner to skip.
+
+<img src="how-to/5-first-time.png" width="240" alt="A how-to card in the middle of the screen: Pick your paper, with a next button and an × in the corner">
+
 Tap one of the papers at the top. Red dots? Blue checks? You pick!
 
-The big sheet is your paper, folded in half. **The left edge is the fold.**
+The big sheet is your paper, folded in half. **The left edge is the fold.** See the two little white dots on it? That's where you start and finish.
 
-Don't want to cut? Tap one of the four little petals under the paper. That makes a flower straight away.
-
-<img src="how-to/5-paper.png" width="240" alt="The cutting screen: five papers at the top, a big red dotty sheet, and four small petal tiles below it">
+<img src="how-to/5-paper.png" width="240" alt="The cutting screen: five papers at the top, a big red dotty sheet with two dots on its left edge, undo, and a ? in the bottom corner">
 
 ---
 
 ## 6. Cut half a petal
 
-1. Put your finger on the **left edge** of the paper.
+1. Put your finger on the **bottom dot**.
 2. Draw a bump out to the right, like half a heart or half a leaf.
-3. Come back to the **left edge**.
-
-The first time you get here, a little knife shows you how: it starts at the dot at the bottom of the fold, goes out and around, and ends at the dot at the top. It also circles the tiny flower in the top corner: that's the preview of your flower. Want to see it all again? Tap the **?** in the bottom corner.
+3. Come back to the **top dot**.
 
 The knife cuts a little bit above your finger, so you can always see the line.
 
-While you cut, a **tiny flower** in the top corner shows what your flower will look like.
+While you cut, a **tiny flower** in the top corner shows what your flower will look like. That's the preview!
+
+Forgot how? Tap the **?** in the bottom corner. A little knife shows you the cut, and the preview gets circled.
 
 Oops? Tap **undo**. Lifted your finger too soon? Put it back on the end of your line and keep going.
 
 When you're done, tap **cut**.
+
+On a Mac it's the same, but you drag with the mouse instead of your finger. The preview sits next to the **cut** button.
 
 <img src="how-to/6-cutting.png" width="240" alt="Half a petal being cut on blue checked paper, and a tiny flower in the corner">
 

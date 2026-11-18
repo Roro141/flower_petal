@@ -220,15 +220,13 @@ struct CutView: View {
             .padding(.top, 8)
             Spacer()
             sheet
-            PresetTiles(paper: paper) { unfold($0) }
-                .padding(.top, 24)
             HStack(spacing: 24) {
                 UndoTab(isEnabled: !cut.strokes.isEmpty, onUndo: { cut.undo() }, onClear: { cut.clear() })
                 if let points = cut.petalPoints {
                     TicketButton("cut") { unfold(points) }
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, 28)
             Spacer()
         }
         .background {
@@ -306,6 +304,11 @@ struct CutView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("folded \(paper.rawValue) paper")
         .accessibilityHint(CutGuide.spokenHint)
+        // Cutting needs a finger on the screen; with VoiceOver, a ready-made petal
+        // gets you to the same flower without drawing.
+        .accessibilityAction(named: "use a ready-made petal") {
+            unfold(Petal.sampleShapes.randomElement() ?? Petal.sampleShapes[0])
+        }
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
@@ -428,42 +431,6 @@ struct PaperFan: View {
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selection)
-    }
-}
-
-/// Four ready-made petals as small cut-paper tiles. Tapping one skips drawing and
-/// goes straight to the unfold, so the flow works without a finger cut (and with VoiceOver).
-private struct PresetTiles: View {
-    let paper: Paper
-    var onPick: ([[Double]]) -> Void
-
-    private static let presets: [(name: String, shape: [[Double]])] = [
-        ("rounded", Petal.sampleShapes[0]),
-        ("pointed", Petal.sampleShapes[1]),
-        ("notched", Petal.sampleShapes[2]),
-        ("heart", Petal.sampleShapes[4]),
-    ]
-    /// Each tile sits a little crooked, as if stuck down by hand.
-    private static let tilts: [Double] = [-3, 2, -1.5, 3.5]
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ForEach(Array(Self.presets.enumerated()), id: \.element.name) { index, preset in
-                Button { onPick(preset.shape) } label: {
-                    PaperFill(paper: paper, scale: 5)
-                        .clipShape(PetalPath(points: preset.shape))
-                        .padding(6)
-                        .frame(width: 48, height: 48)
-                        .background {
-                            Rectangle().fill(Color.ink.opacity(0.35)).offset(x: 2, y: 3)
-                            Rectangle().fill(Color.cream)
-                        }
-                }
-                .buttonStyle(.plain)
-                .rotationEffect(.degrees(Self.tilts[index]))
-                .accessibilityLabel("\(preset.name) petal")
-            }
-        }
     }
 }
 
@@ -819,6 +786,14 @@ private struct Ruler: View {
 
 #Preview {
     CutView(owner: "a", paper: .dots, onBack: {}, onPlant: { _ in })
+}
+
+#Preview("after the how-to") {
+    // As it looks once the how-to cards have been seen.
+    let defaults = UserDefaults(suiteName: "preview-how-to-seen") ?? .standard
+    defaults.set(true, forKey: "hasSeenHowToCut")
+    return CutView(owner: "a", paper: .dots, onBack: {}, onPlant: { _ in })
+        .defaultAppStorage(defaults)
 }
 
 #Preview("cut in progress") {
