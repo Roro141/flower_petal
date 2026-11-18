@@ -62,6 +62,8 @@ Don't want to cut? Tap one of the four little petals under the paper. That makes
 2. Draw a bump out to the right, like half a heart or half a leaf.
 3. Come back to the **left edge**.
 
+The first time you get here, a little knife shows you how: it starts at the dot at the bottom of the fold, goes out and around, and ends at the dot at the top. It also circles the tiny flower in the top corner: that's the preview of your flower. Want to see it all again? Tap the **?** in the bottom corner.
+
 The knife cuts a little bit above your finger, so you can always see the line.
 
 While you cut, a **tiny flower** in the top corner shows what your flower will look like.

@@ -134,6 +134,16 @@ struct CutView: View {
     /// How many petals the flower will have; picked now so the live preview matches
     /// what unfolds. Can be changed after the unfold.
     @State private var count = Int.random(in: 5...8)
+    /// The how-to cards: shown the first time this screen opens, and again from "?".
+    /// The how-to cards: once, the first time this screen opens. (Kept for a later
+    /// setting to bring them back.)
+    @AppStorage("hasSeenHowToCut") private var hasSeenHowTo = false
+    @State private var showsHowTo = false
+    /// The animation on the paper, from "?": the knife traces a cut and the preview
+    /// shows the flower it makes, circled.
+    @State private var showsGuide = false
+    /// Bumped by "?" so the animation plays again from the start.
+    @State private var guidePlays = 0
 
     /// The flower the cut so far would make, rebuilt on every drag update.
     private var preview: Petal? {
@@ -158,6 +168,15 @@ struct CutView: View {
         } else {
             cutting
                 .transition(.opacity)
+                .overlay {
+                    if showsHowTo {
+                        HowToCut {
+                            hasSeenHowTo = true
+                            withAnimation(.easeOut(duration: 0.2)) { showsHowTo = false }
+                        }
+                        .transition(.opacity)
+                    }
+                }
         }
     }
 
@@ -171,16 +190,31 @@ struct CutView: View {
                 Spacer()
                 PaperFan(selection: $paper)
                 Spacer()
-                // The flower the cut so far makes; same width as the back arrow's slot,
-                // so the fan stays in the middle.
-                Group {
+                // The flower the cut so far makes (while the animation plays, the one its
+                // cut makes, circled). Same width as the back arrow's slot, so the fan
+                // stays in the middle.
+                ZStack {
+                    // Holds the slot open when it's empty, so the fan never shifts.
+                    Color.clear
                     if let preview {
                         FlowerView(petal: preview, size: 56)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("your flower so far")
+                    } else if showsGuide,
+                              let example = CutGuide.flower(owner: owner, paper: paper, count: count, sheet: sheetSize) {
+                        FlowerView(petal: example, size: 56)
+                            .accessibilityHidden(true)
                     }
                 }
                 .frame(width: 56, height: 56)
+                .overlay(alignment: .topTrailing) {
+                    if showsGuide {
+                        PreviewCallout(width: 74, height: 70)
+                            .padding(.top, -7)
+                            .padding(.trailing, -9)
+                            .transition(.opacity)
+                    }
+                }
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -199,6 +233,15 @@ struct CutView: View {
         }
         .background {
             CuttingMat().ignoresSafeArea()
+        }
+        // "?" in the bottom corner brings the how-to back.
+        .overlay(alignment: .bottomTrailing) {
+            HelpTab { playGuide() }
+                .padding(.trailing, 16)
+                .padding(.bottom, 4)
+        }
+        .onAppear {
+            if !hasSeenHowTo { showHowTo() }
         }
         // Top left, over the back arrow while cutting, so the live preview stays in view.
         .overlay(alignment: .topLeading) {
@@ -220,6 +263,10 @@ struct CutView: View {
                 .frame(width: 1.5)
             notch
             PaperGrain()
+            // Where to start and finish, until the cut is closed.
+            if !cut.isClosed {
+                FoldMarks(size: sheetSize)
+            }
             CutLine(strokes: cut.strokes)
                 .stroke(Color.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
             // Unfinished: a faint dashed ghost from the end of the cut back to the crease.
@@ -237,6 +284,13 @@ struct CutView: View {
     private var sheet: some View {
         sheetLayers
         .overlay(alignment: .topLeading) {
+            if showsGuide {
+                CutGuide(size: sheetSize)
+                    .id(guidePlays)
+                    .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topLeading) {
             if let tip {
                 Knife(tip: tip)
                     .allowsHitTesting(false)
@@ -251,10 +305,12 @@ struct CutView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("folded \(paper.rawValue) paper")
+        .accessibilityHint(CutGuide.spokenHint)
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     if tip == nil {
+                        hideGuide()
                         knifeOffset = cut.knifeOffset(forFingerAt: value.startLocation, reach: Self.knifeReach)
                         cut.touchDown(at: knifeTip(for: value.startLocation))
                     }
@@ -275,6 +331,21 @@ struct CutView: View {
             CubicKeyframe(-4, duration: 0.08)
             SpringKeyframe(0, duration: 0.3)
         }
+    }
+
+    private func showHowTo() {
+        withAnimation(.easeOut(duration: 0.2)) { showsHowTo = true }
+    }
+
+    private func playGuide() {
+        guidePlays += 1
+        withAnimation(.easeOut(duration: 0.2)) { showsGuide = true }
+    }
+
+    /// The first touch on the paper puts the animation away.
+    private func hideGuide() {
+        guard showsGuide else { return }
+        withAnimation(.easeOut(duration: 0.2)) { showsGuide = false }
     }
 
     private func unfold(_ points: [[Double]]) {
@@ -518,6 +589,183 @@ private struct Knife: View {
     }
 }
 
+/// The how-to, drawn on the folded sheet with no words: a mark at the bottom corner
+/// of the fold (start) and one at the top corner (end), a dashed pencil line out
+/// between them in a petal shape, and the knife tracing it twice before resting on
+/// the start. With Reduce Motion the knife just rests on the start.
+struct CutGuide: View {
+    /// The folded sheet; the fold is its left edge.
+    let size: CGSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// What VoiceOver says about the paper, in place of the drawing.
+    static let spokenHint = "Start at the bottom of the fold, cut out and around, and come back to the top of the fold."
+
+    /// In the how-to cards it keeps tracing, with a short rest at the start each time.
+    var loops = false
+
+    private static let passDuration = 1.5
+    private static let passes = 2.0
+    private static let rest = 0.8
+
+    @State private var start = Date.now
+
+    /// Where the cut starts (bottom of the fold) and finishes (top of the fold).
+    static func startPoint(in size: CGSize) -> CGPoint { curves(in: size)[0][0] }
+    static func endPoint(in size: CGSize) -> CGPoint { curves(in: size)[1][3] }
+
+    private var startMark: CGPoint { Self.startPoint(in: size) }
+
+    /// The guide's cut as two cubic curves (start, control, control, end): out from the
+    /// bottom of the fold, round in a petal's curve, and back to the fold near the top.
+    private static func curves(in size: CGSize) -> [[CGPoint]] {
+        let w = size.width, h = size.height
+        let middle = CGPoint(x: w * 0.52, y: h * 0.5)
+        return [
+            [CGPoint(x: 0, y: h * 0.8), CGPoint(x: w * 0.3, y: h * 0.8), CGPoint(x: w * 0.54, y: h * 0.66), middle],
+            [middle, CGPoint(x: w * 0.5, y: h * 0.32), CGPoint(x: w * 0.2, y: h * 0.16), CGPoint(x: 0, y: h * 0.14)],
+        ]
+    }
+
+    private var path: Path {
+        var path = Path()
+        let curves = Self.curves(in: size)
+        path.move(to: curves[0][0])
+        for curve in curves {
+            path.addCurve(to: curve[3], control1: curve[1], control2: curve[2])
+        }
+        return path
+    }
+
+    /// The flower the guide's cut makes, shown as the preview while the guide plays.
+    static func flower(owner: String, paper: Paper, count: Int, sheet: CGSize) -> Petal? {
+        let points = curves(in: sheet).flatMap { curve in
+            (0...12).map { step -> CGPoint in
+                let t = CGFloat(step) / 12, u = 1 - t
+                let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t
+                return CGPoint(x: a * curve[0].x + b * curve[1].x + c * curve[2].x + d * curve[3].x,
+                               y: a * curve[0].y + b * curve[1].y + c * curve[2].y + d * curve[3].y)
+            }
+        }
+        return CutShape.petalPoints(from: points).map {
+            Petal(id: 0, owner: owner, pattern: paper, nPetals: count, points: $0)
+        }
+    }
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion)) { context in
+            let elapsed = context.date.timeIntervalSince(start)
+            // 0…1 along the line on each pass; after the last pass (or between passes,
+            // when looping) it rests at the start.
+            let cycle = Self.passDuration + Self.rest
+            let looped = elapsed.truncatingRemainder(dividingBy: cycle)
+            let progress = reduceMotion ? 0
+                : loops ? min(looped / Self.passDuration, 1) * (looped < Self.passDuration ? 1 : 0)
+                : elapsed >= Self.passDuration * Self.passes ? 0
+                : (elapsed / Self.passDuration).truncatingRemainder(dividingBy: 1)
+            ZStack(alignment: .topLeading) {
+                path.stroke(Color.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                // The part the knife has been along so far, like a light pencil line.
+                path.trimmedPath(from: 0, to: progress)
+                    .stroke(Color.ink.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                FoldMarks(size: size)
+                Knife(tip: progress > 0 ? (path.trimmedPath(from: 0, to: progress).currentPoint ?? startMark) : startMark)
+            }
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+}
+
+/// The two cream paper dots stuck on the fold: start at the bottom, finish at the top.
+struct FoldMarks: View {
+    let size: CGSize
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            mark(at: CutGuide.endPoint(in: size))
+            mark(at: CutGuide.startPoint(in: size))
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func mark(at point: CGPoint) -> some View {
+        Circle()
+            .fill(Color.cream)
+            .overlay { Circle().stroke(Color.ink, lineWidth: 1) }
+            .frame(width: 12, height: 12)
+            .background { Circle().fill(Color.ink.opacity(0.3)).offset(x: 1.5, y: 2) }
+            .position(x: point.x + 6, y: point.y)
+    }
+}
+
+/// A typewritten "?" straight on the mat, to bring the how-to back.
+struct HelpTab: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("?")
+                .font(.custom(Typeface.specialElite.rawValue, size: 28, relativeTo: .title2))
+                .foregroundStyle(Color.cream)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("how to cut")
+    }
+}
+
+/// While the animation plays: a pencil loop drawn round the preview, with a note under it.
+struct PreviewCallout: View {
+    var width: CGFloat
+    var height: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawn: CGFloat = 0
+
+    var body: some View {
+        PencilLoop()
+            .trim(from: 0, to: reduceMotion ? 1 : drawn)
+            .stroke(Color.cream, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .frame(width: width, height: height)
+            .overlay(alignment: .topTrailing) {
+                Text("this is the preview")
+                    .font(Fonts.controlLabel())
+                    .foregroundStyle(Color.cream)
+                    .fixedSize()
+                    .offset(y: height + 4)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 0.5).delay(0.3)) { drawn = 1 }
+            }
+    }
+}
+
+/// A quick pencil circle: a bit over one turn, not quite round.
+struct PencilLoop: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let rx = rect.width / 2, ry = rect.height / 2
+        // A bit over one turn, the radius drifting so the ends overlap off-centre.
+        for step in 0...60 {
+            let t = Double(step) / 60
+            let angle = -2.2 + t * 2.15 * .pi
+            let wobble = 1 + 0.06 * sin(t * 9) - 0.05 * t
+            let point = CGPoint(x: c.x + cos(angle) * rx * wobble, y: c.y + sin(angle) * ry * wobble)
+            step == 0 ? path.move(to: point) : path.addLine(to: point)
+        }
+        return path
+    }
+}
+
 /// The cut so far, drawn as one joined line.
 private struct CutLine: Shape {
     let strokes: [[CGPoint]]
@@ -532,7 +780,7 @@ private struct CutLine: Shape {
 }
 
 /// Dark green self-healing mat with a faint grid.
-private struct CuttingMat: View {
+struct CuttingMat: View {
     var body: some View {
         Canvas { context, size in
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.mat))

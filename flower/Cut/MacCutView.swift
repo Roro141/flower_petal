@@ -19,6 +19,21 @@ struct MacCutView: View {
     /// Set when a press didn't start (or finish) the cut, so the rest of it is ignored.
     @State private var ignoringStroke = false
     @State private var unfolding: Petal?
+    /// The how-to cards (shared with the phone's): first open, and from "?".
+    @AppStorage("hasSeenHowToCut") private var hasSeenHowTo = false
+    @State private var showsHowTo = false
+    /// The animation on the paper, from "?" (same as the phone's).
+    @State private var showsGuide = false
+    @State private var guidePlays = 0
+    /// Picked now so the preview matches what unfolds.
+    @State private var count = Int.random(in: 5...8)
+
+    /// The flower the cut so far would make, rebuilt as the cut grows.
+    private var preview: Petal? {
+        CutShape.previewPoints(from: points).map {
+            Petal(id: 0, owner: owner, pattern: paper, nPetals: count, points: $0)
+        }
+    }
 
     private let sheetSize = CGSize(width: 300, height: 400)
     /// A first press this close to the crease starts the cut on it.
@@ -38,6 +53,15 @@ struct MacCutView: View {
             }, onPlant: onPlant)
         } else {
             cutting
+                .overlay {
+                    if showsHowTo {
+                        HowToCut(isMac: true) {
+                            hasSeenHowTo = true
+                            withAnimation(.easeOut(duration: 0.2)) { showsHowTo = false }
+                        }
+                        .transition(.opacity)
+                    }
+                }
         }
     }
 
@@ -59,6 +83,31 @@ struct MacCutView: View {
             }
             sheet
             VStack(spacing: 16) {
+                // The flower the cut so far makes; while the animation plays, the one
+                // its cut makes, circled.
+                ZStack {
+                    // Holds the slot open when it's empty, so the tickets never shift.
+                    Color.clear
+                    if let preview {
+                        FlowerView(petal: preview, size: 80)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("your flower so far")
+                    } else if showsGuide,
+                              let example = CutGuide.flower(owner: owner, paper: paper, count: count, sheet: sheetSize) {
+                        FlowerView(petal: example, size: 80)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(width: 80, height: 80)
+                .overlay(alignment: .topTrailing) {
+                    if showsGuide {
+                        PreviewCallout(width: 104, height: 98)
+                            .padding(.top, -9)
+                            .padding(.trailing, -12)
+                            .transition(.opacity)
+                    }
+                }
+                .padding(.bottom, 28)
                 TicketButton("cut") { finish() }
                     .disabled(points.count < 2)
                     .opacity(points.count < 2 ? 0.5 : 1)
@@ -68,11 +117,19 @@ struct MacCutView: View {
         .padding(32)
         .frame(minWidth: 680, minHeight: 500)
         .background(Color.mat)
+        // "?" in the bottom corner plays the how-to again.
+        .overlay(alignment: .bottomTrailing) {
+            HelpTab { playGuide() }
+                .padding(12)
+        }
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.return) { finish(); return .handled }
         .onKeyPress(.delete) { if !points.isEmpty { points.removeLast() }; return .handled }
         .onKeyPress(.escape) { onCancel(); return .handled }
+        .onAppear {
+            if !hasSeenHowTo { showHowTo() }
+        }
     }
 
     private var sheet: some View {
@@ -92,6 +149,17 @@ struct MacCutView: View {
             }
         }
         .frame(width: sheetSize.width, height: sheetSize.height)
+        .overlay(alignment: .topLeading) {
+            // Where to start and finish (closing the cut moves on to the unfold).
+            FoldMarks(size: sheetSize)
+        }
+        .overlay(alignment: .topLeading) {
+            if showsGuide {
+                CutGuide(size: sheetSize)
+                    .id(guidePlays)
+                    .transition(.opacity)
+            }
+        }
         .background { Rectangle().fill(Color.ink.opacity(0.35)).offset(x: 4, y: 6) }
         .contentShape(Rectangle())
         .gesture(
@@ -110,6 +178,22 @@ struct MacCutView: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("folded \(paper.rawValue) paper")
+        .accessibilityHint(CutGuide.spokenHint)
+    }
+
+    private func showHowTo() {
+        withAnimation(.easeOut(duration: 0.2)) { showsHowTo = true }
+    }
+
+    private func playGuide() {
+        guidePlays += 1
+        withAnimation(.easeOut(duration: 0.2)) { showsGuide = true }
+    }
+
+    /// The first click on the paper puts the animation away.
+    private func hideGuide() {
+        guard showsGuide else { return }
+        withAnimation(.easeOut(duration: 0.2)) { showsGuide = false }
     }
 
     // MARK: - Drawing and placing points
@@ -117,6 +201,7 @@ struct MacCutView: View {
     /// The mouse went down: starts the cut on the crease, closes it if it's on the first
     /// point, or otherwise joins the cut to here with a straight snip (a click).
     private func begin(at point: CGPoint) {
+        hideGuide()
         ignoringStroke = false
         guard let first = points.first else {
             guard point.x <= snapDistance else { ignoringStroke = true; return }
@@ -157,7 +242,7 @@ struct MacCutView: View {
         var cut = points
         if last.x != 0 { cut.append(CGPoint(x: 0, y: last.y)) }
         guard let shape = CutShape.petalPoints(from: cut) else { return }
-        unfolding = Petal(id: 0, owner: owner, pattern: paper, nPetals: Int.random(in: 5...8), points: shape)
+        unfolding = Petal(id: 0, owner: owner, pattern: paper, nPetals: count, points: shape)
     }
 }
 
