@@ -46,6 +46,25 @@ enum CutShape {
         return simple.map { [rounded($0.x), rounded($0.y)] }
     }
 
+    /// The petal made fuller (factor > 1) or slimmer (< 1) by scaling its width,
+    /// kept within the petal's square.
+    static func widened(_ points: [[Double]], by factor: Double) -> [[Double]] {
+        points.map { pair in
+            guard pair.count == 2 else { return pair }
+            return [rounded(CGFloat(min(pair[0] * factor, 1))), pair[1]]
+        }
+    }
+
+    /// The cut so far as a petal, closed straight back to the crease, for the live
+    /// preview while it's still being cut. nil until there's enough of a line.
+    static func previewPoints(from cut: [CGPoint]) -> [[Double]]? {
+        var points = removingRepeats(cut)
+        guard let last = points.last, points.count >= 2 else { return nil }
+        if last.x != 0 { points.append(CGPoint(x: 0, y: last.y)) }
+        guard points.contains(where: { $0.x > 1 }) else { return nil }
+        return petalPoints(from: points)
+    }
+
     /// Fewest points that keep the shape: Ramer–Douglas–Peucker, loosening the
     /// tolerance until there are at most 12.
     private static func simplified(_ points: [CGPoint]) -> [CGPoint] {

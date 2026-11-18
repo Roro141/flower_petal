@@ -73,6 +73,8 @@ struct WindowScene<Plant: View>: View {
                     .accessibilityLabel(petal.isWilted(at: now)
                         ? "\(sill.name(for: petal.owner))'s flower, resting"
                         : "\(sill.name(for: petal.owner))'s flower")
+                    // Nameless flowers (the sign-in and name screens) are decoration, not friends.
+                    .accessibilityHidden(sill.name(for: petal.owner).isEmpty)
                 }
             }
             .padding(.top, plantsTopInset)

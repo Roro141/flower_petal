@@ -19,6 +19,7 @@ enum PetalService {
         let n_petals: Int
         var points: [[Double]]?
         var created_at: Date?
+        var centre: String?
     }
 
     /// What the app sends when planting; the server fills in id, owner and time.
@@ -27,6 +28,7 @@ enum PetalService {
         let points: [[Double]]
         let pattern: String
         let n_petals: Int
+        var centre: String? = nil
     }
 
     private struct MemberRow: Decodable {
@@ -111,7 +113,9 @@ enum PetalService {
 
         let petalRequest = makeRequest(
             path: "latest_petals",
-            query: "select=id,profile_id,pattern,n_petals,points,created_at&group_id=eq.\(mine.group_id)",
+            // Every column, so a column the server doesn't have yet (centre, before
+            // migration 006) can't make the whole fetch fail and freeze the widget.
+            query: "select=*&group_id=eq.\(mine.group_id)",
             session: session
         )
         let latest: [PetalRow] = try await send(petalRequest)
@@ -143,7 +147,8 @@ enum PetalService {
         request.httpMethod = "POST"
         request.setValue("return=representation", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(
-            NewPetal(group_id: groupID, points: petal.points, pattern: petal.pattern.rawValue, n_petals: petal.nPetals)
+            NewPetal(group_id: groupID, points: petal.points, pattern: petal.pattern.rawValue,
+                     n_petals: petal.nPetals, centre: petal.centre?.rawValue)
         )
         let rows: [PetalRow] = try await send(request)
         guard let stored = rows.first else { throw ServiceError.emptyResponse }
@@ -212,7 +217,8 @@ extension Petal {
             pattern: Paper(stored: row.pattern),
             nPetals: row.n_petals,
             points: points.count >= 3 ? points : shapes[abs(id) % shapes.count],
-            createdAt: row.created_at
+            createdAt: row.created_at,
+            centre: row.centre.flatMap(FlowerCentre.init(rawValue:))
         )
     }
 }

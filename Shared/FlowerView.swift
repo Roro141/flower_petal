@@ -56,7 +56,7 @@ struct FlowerView: View {
                 )
             }
             CentreView(
-                style: FlowerCentre.for(owner: petal.owner),
+                style: petal.centre ?? FlowerCentre.for(owner: petal.owner),
                 diameter: size * 0.2,
                 turn: placements.first?.angle ?? 0
             )
@@ -87,9 +87,17 @@ private struct Crease: Shape {
     }
 }
 
-/// The five flower centres, one picked per owner.
-enum FlowerCentre: CaseIterable {
-    case button, seeds, crossStitch, star, kraft
+/// The five flower centres. Each owner has a usual one; a centre picked while
+/// tweaking is stored with the petal (as the raw value).
+enum FlowerCentre: String, Codable, CaseIterable, Sendable {
+    // This order picks each owner's usual centre, so it must not change.
+    case button, seeds, crossStitch = "cross", star, kraft
+
+    /// The order they're offered in when tweaking.
+    static let pickerOrder: [FlowerCentre] = [.button, .seeds, .star, .crossStitch, .kraft]
+
+    /// Spoken and shown name.
+    var name: String { rawValue }
 
     static func `for`(owner: String) -> FlowerCentre {
         var random = SeededRandom(owner + "-centre")

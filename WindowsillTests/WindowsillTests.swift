@@ -73,6 +73,52 @@ struct WindowsillTests {
         #expect(object?["pattern"] as? String == "dots")
     }
 
+    @Test func pickedCentreIsSavedAndReadBack() throws {
+        let row = PetalService.NewPetal(group_id: "g", points: [[0, 0], [0.3, 0.5], [0, 1]], pattern: "dots",
+                                        n_petals: 6, centre: FlowerCentre.crossStitch.rawValue)
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
+        #expect(object?["centre"] as? String == "cross")
+
+        let json = #"[{"id":3,"profile_id":"b","pattern":"dots","n_petals":6,"points":[[0,0],[0.3,0.5],[0,1]],"centre":"star"}]"#
+        #expect(Petal(row: try decodeRows(json)[0]).centre == .star)
+        // Rows from before centres were saved keep the owner's usual one.
+        let old = #"[{"id":4,"profile_id":"b","pattern":"dots","n_petals":6,"points":[[0,0],[0.3,0.5],[0,1]]}]"#
+        #expect(Petal(row: try decodeRows(old)[0]).centre == nil)
+    }
+
+    @Test func fetchingEveryColumnStillReadsTheRow() throws {
+        // select=* also brings group_id and anything added later; those are skipped.
+        let json = #"[{"id":5,"profile_id":"b","group_id":"g","pattern":"stripe","n_petals":7,"points":[[0,0],[0.3,0.5],[0,1]],"created_at":"2026-11-14T22:46:11.61449+00:00","someday":true}]"#
+        let petal = Petal(row: try decodeRows(json)[0])
+        #expect(petal.pattern == .stripe && petal.nPetals == 7 && petal.centre == nil)
+    }
+
+    @Test func centresKeepTheirOrderSoEveryonesUsualCentreStays() {
+        #expect(FlowerCentre.allCases == [.button, .seeds, .crossStitch, .star, .kraft])
+        #expect(Set(FlowerCentre.pickerOrder) == Set(FlowerCentre.allCases))
+    }
+
+    @Test func fullnessScalesTheWidthOnlyAndStaysInTheSquare() {
+        let points: [[Double]] = [[0, 0], [0.3, 0.4], [0.9, 0.6], [0, 1]]
+        let full = CutShape.widened(points, by: 1.2)
+        #expect(full.map { $0[1] } == points.map { $0[1] })
+        #expect(abs(full[1][0] - 0.36) < 0.001)
+        #expect(full[2][0] == 1)
+        #expect(CutShape.widened(points, by: 0.8)[1][0] < 0.3)
+        #expect(CutShape.widened(points, by: 1) == points)
+    }
+
+    @Test func liveFlowerAppearsWhileStillCutting() throws {
+        // Out from the crease and up, not back yet.
+        let open = [CGPoint(x: 0, y: 300), CGPoint(x: 60, y: 250), CGPoint(x: 80, y: 180), CGPoint(x: 40, y: 120)]
+        let points = try #require(CutShape.previewPoints(from: open))
+        #expect(points.first == [0, 0])
+        #expect(points.last?.first == 0)
+        // Just a touch on the crease isn't a flower yet.
+        #expect(CutShape.previewPoints(from: [CGPoint(x: 0, y: 300)]) == nil)
+        #expect(CutShape.previewPoints(from: [CGPoint(x: 0, y: 300), CGPoint(x: 0, y: 250)]) == nil)
+    }
+
     @Test func sillPutsMeFirstThenFriendsInJoinOrder() {
         let start = Date(timeIntervalSince1970: 0)
         let members = [

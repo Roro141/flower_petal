@@ -40,3 +40,26 @@ struct SamplesView: View {
     SamplesView()
         .onAppear { Fonts.register() }
 }
+
+/// For the how-to guide (docs/HOW-TO.md): the main screen as it looks once you're on a
+/// windowsill with friends. The real one needs a signed-in session to show.
+#Preview("How-to: main screen") {
+    VStack(spacing: 0) {
+        HStack {
+            Spacer()
+            TapeLabel(text: "invite", tilt: 4)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        Spacer()
+        SillView(sill: .preview, plantSize: 96)
+        Spacer()
+        TicketButton("cut") {}
+        Spacer()
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background {
+        Color.wall.ignoresSafeArea()
+        PaperGrain().ignoresSafeArea()
+    }
+}

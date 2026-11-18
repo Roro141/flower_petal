@@ -131,6 +131,16 @@ struct CutView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The cut, opened out into a flower, once "cut" is tapped.
     @State private var unfolding: Petal?
+    /// How many petals the flower will have; picked now so the live preview matches
+    /// what unfolds. Can be changed after the unfold.
+    @State private var count = Int.random(in: 5...8)
+
+    /// The flower the cut so far would make, rebuilt on every drag update.
+    private var preview: Petal? {
+        CutShape.previewPoints(from: Array(cut.strokes.joined())).map { points in
+            Petal(id: 0, owner: owner, pattern: paper, nPetals: count, points: points)
+        }
+    }
 
     private var sheetSize: CGSize { Self.sheetSize }
 
@@ -157,11 +167,20 @@ struct CutView: View {
                 .frame(height: 28)
             HStack {
                 BackArrow(action: onBack)
+                    .frame(width: 56, alignment: .leading)
                 Spacer()
                 PaperFan(selection: $paper)
                 Spacer()
-                // Balances the back arrow so the fan sits in the middle.
-                Color.clear.frame(width: 44, height: 44)
+                // The flower the cut so far makes; same width as the back arrow's slot,
+                // so the fan stays in the middle.
+                Group {
+                    if let preview {
+                        FlowerView(petal: preview, size: 56)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("your flower so far")
+                    }
+                }
+                .frame(width: 56, height: 56)
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -181,11 +200,12 @@ struct CutView: View {
         .background {
             CuttingMat().ignoresSafeArea()
         }
-        .overlay(alignment: .topTrailing) {
+        // Top left, over the back arrow while cutting, so the live preview stays in view.
+        .overlay(alignment: .topLeading) {
             if let tip {
                 loupe(at: tip)
                     .padding(.top, 36)
-                    .padding(.trailing, 16)
+                    .padding(.leading, 16)
             }
         }
     }
@@ -262,7 +282,7 @@ struct CutView: View {
             id: 0,
             owner: owner,
             pattern: paper,
-            nPetals: Int.random(in: 5...8),
+            nPetals: count,
             points: points
         )
         withAnimation(Self.pageTurn) { unfolding = petal }
@@ -306,7 +326,8 @@ struct CutView: View {
 }
 
 /// The five papers as a small fan of sheets; the chosen one sits raised.
-private struct PaperFan: View {
+/// Used on the cutting screen and again when tweaking the flower.
+struct PaperFan: View {
     @Binding var selection: Paper
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -550,4 +571,25 @@ private struct Ruler: View {
 
 #Preview {
     CutView(owner: "a", paper: .dots, onBack: {}, onPlant: { _ in })
+}
+
+#Preview("cut in progress") {
+    // An open cut, out from the crease and up, as it looks mid-drag, and the live
+    // flower it would make.
+    let line = (0...24).map { step in
+        let t = Double(step) / 24
+        return CGPoint(x: sin(t * .pi * 0.85) * 95, y: 290 - t * 210)
+    }
+    let points = CutShape.previewPoints(from: line) ?? []
+    return HStack(alignment: .top, spacing: 24) {
+        ZStack(alignment: .topLeading) {
+            PaperFill(paper: .gingham, scale: 14)
+            CutLine(strokes: [line])
+                .stroke(Color.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+        }
+        .frame(width: 260, height: 360)
+        FlowerView(petal: Petal(id: 0, owner: "a", pattern: .gingham, nPetals: 6, points: points), size: 56)
+    }
+    .padding()
+    .background(Color.mat)
 }

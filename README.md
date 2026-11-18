@@ -4,6 +4,8 @@ A shared paper-collage windowsill for 2–6 close friends, living in iPhone home
 
 Each friend cuts one petal from patterned paper folded in half. The app mirrors it across the fold and repeats it around a centre to make that friend's flower. Everyone's flowers sit side by side in pots on one sill.
 
+New here? [How to use Windowsill](docs/HOW-TO.md) walks through it step by step, with pictures.
+
 See [PLAN.md](PLAN.md) for the milestones and [CLAUDE.md](CLAUDE.md) for the design brief.
 
 ## Plants so far

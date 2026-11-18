@@ -123,6 +123,15 @@ struct ContentView: View {
     /// Works out where we are from the server: signed in? named? on a windowsill?
     /// Joins a pending invite on the way if there is one.
     private func refresh(suggestedName: String = "") async {
+        #if DEBUG
+        // Launched with -walkthrough (simulator UI checks): a sample windowsill, no
+        // sign-in and no network. With no session, planting does nothing.
+        if CommandLine.arguments.contains("-walkthrough") {
+            sill = .preview
+            stage = .window
+            return
+        }
+        #endif
         if isRefreshing {
             needsAnotherRefresh = true
             return
@@ -203,7 +212,11 @@ struct ContentView: View {
     private func plant(_ petal: Petal) {
         guard let session, var current = sill,
               let index = current.petals.firstIndex(where: { $0.owner == petal.owner }) else { return }
-        current.petals[index] = petal
+        // Planted now: earlier gusts no longer count against it, so its fallen petals
+        // are swept straight away instead of after the server replies.
+        var planted = petal
+        planted.createdAt = .now
+        current.petals[index] = planted
         sill = current
         Task {
             do {

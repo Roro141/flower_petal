@@ -33,6 +33,8 @@ struct Petal: Codable, Hashable, Identifiable, Sendable {
     var nPetals: Int        // 5–8
     var points: [[Double]]
     var createdAt: Date?
+    /// The centre picked when it was planted; older petals without one get the owner's usual centre.
+    var centre: FlowerCentre?
 }
 
 /// A whole petal: the half-polygon mirrored across the fold, with corners
