@@ -207,4 +207,8 @@ extension Color {
     static let wood = Color(hex: "#C29A6B")
     static let sill = Color(hex: "#B98E62")
     static let mat = Color(hex: "#3E5747")
+    static let kraft = Color(hex: "#E8DAC2")
+    static let tape = Color(hex: "#E9D9A6")
+    /// For things that can't be undone (delete account).
+    static let danger = Color(hex: "#8E3B34")
 }

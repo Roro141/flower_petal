@@ -25,7 +25,7 @@ struct SillPanel: View {
             }
         }
         .frame(width: 420)
-        .background(Color.wall)
+        .background { WallFill() }
         .task {
             while !Task.isCancelled {
                 await refresh()

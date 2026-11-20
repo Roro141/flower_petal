@@ -30,6 +30,8 @@ enum Fonts {
     /// Labels on the flower controls (petals, fullness, centre, paper), typewritten.
     static func controlLabel() -> Font { .custom(Typeface.specialElite.rawValue, size: 13, relativeTo: .caption) }
     static func body() -> Font { .custom(reading.rawValue, size: 15, relativeTo: .body) }
+    /// Secondary lines under a row's title.
+    static func small() -> Font { .custom(reading.rawValue, size: 13, relativeTo: .footnote) }
     static func button() -> Font { .custom(buttons.rawValue, size: 15, relativeTo: .body) }
 
     /// Makes the bundled fonts available to this process. Call once at launch,

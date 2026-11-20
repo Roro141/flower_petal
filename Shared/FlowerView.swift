@@ -392,11 +392,11 @@ struct PlantView: View {
     /// Widths, height and colours for each pot, in multiples of `unit`.
     private func potShape(unit: CGFloat) -> (topWidth: CGFloat, bottomWidth: CGFloat, height: CGFloat, body: Color, rim: Color) {
         switch pot {
-        case .tapered: (unit * 1.5, unit * 1.08, unit, .wood, .sill)
-        case .tin: (unit * 1.25, unit * 1.25, unit * 0.95, .sky, .grey)
-        case .bowl: (unit * 1.6, unit * 1.6, unit * 0.7, .cream, .wood)
-        case .tallSlim: (unit * 0.95, unit * 0.78, unit * 1.35, .sill, .wood)
-        case .squat: (unit * 1.65, unit * 1.45, unit * 0.6, .grey, .cream)
+        case .tapered: (unit * 1.5, unit * 1.08, unit, pot.colour, .sill)
+        case .tin: (unit * 1.25, unit * 1.25, unit * 0.95, pot.colour, .grey)
+        case .bowl: (unit * 1.6, unit * 1.6, unit * 0.7, pot.colour, .wood)
+        case .tallSlim: (unit * 0.95, unit * 0.78, unit * 1.35, pot.colour, .wood)
+        case .squat: (unit * 1.65, unit * 1.45, unit * 0.6, pot.colour, .cream)
         }
     }
 
@@ -408,6 +408,17 @@ extension PotStyle {
     /// Each place on the sill gets a different pot, left to right.
     static func forSill(_ index: Int) -> PotStyle {
         allCases[index % allCases.count]
+    }
+
+    /// The pot's paper colour. Settings uses it for each friend's chip.
+    var colour: Color {
+        switch self {
+        case .tapered: .wood
+        case .tin: .sky
+        case .bowl: .cream
+        case .tallSlim: .sill
+        case .squat: .grey
+        }
     }
 }
 

@@ -19,6 +19,7 @@ struct ContentView: View {
     /// An invite link opened before we were ready to join (signed out, or no name yet).
     @State private var pendingInvite: String?
     @State private var isCutting = false
+    @State private var isShowingSettings = false
     /// Refreshes run one at a time. One asked for while another is running (e.g. an
     /// invite link arriving during launch) runs straight after it instead.
     /// Bumped to play a gust in the window; see `SillView`.
@@ -63,6 +64,12 @@ struct ContentView: View {
     private var window: some View {
         VStack(spacing: 0) {
             HStack {
+                if sill != nil {
+                    Button { isShowingSettings = true } label: {
+                        TapeLabel(text: "settings", tilt: -3)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Spacer()
                 if let url = sill?.inviteURL {
                     ShareLink(item: url) {
@@ -87,7 +94,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             // The wall, with the same grain as the window (which has its own).
-            Color.wall.ignoresSafeArea()
+            WallFill().ignoresSafeArea()
             PaperGrain().ignoresSafeArea()
         }
         // Check for friends' petals and gusts while the window is open, and on coming back to it.
@@ -101,6 +108,9 @@ struct ContentView: View {
             if scenePhase == .active { Task { await refresh() } }
         }
         #if os(iOS)
+        .fullScreenCover(isPresented: $isShowingSettings) {
+            if let sill { settings(sill) }
+        }
         .fullScreenCover(isPresented: $isCutting) {
             CutView(owner: sill?.myID ?? "", paper: .dots, onBack: { isCutting = false }, onPlant: { petal in
                 isCutting = false
@@ -108,6 +118,12 @@ struct ContentView: View {
             })
         }
         #else
+        .sheet(isPresented: $isShowingSettings) {
+            if let sill {
+                settings(sill)
+                    .frame(minWidth: 420, minHeight: 640)
+            }
+        }
         // On the Mac, cutting is point-and-click in its own window-sized sheet.
         .sheet(isPresented: $isCutting) {
             MacCutView(owner: sill?.myID ?? "", onCancel: { isCutting = false }, onPlant: { petal in
@@ -116,6 +132,36 @@ struct ContentView: View {
             })
         }
         #endif
+    }
+
+    private func settings(_ sill: Sill) -> some View {
+        SettingsView(sill: sill, onBack: { isShowingSettings = false }, onRename: { name in
+            Task { await saveName(name) }
+        }, onSignOut: {
+            isShowingSettings = false
+            Auth.signOut()
+            // Finds nobody signed in: clears the sill and the widget, and shows sign-in.
+            Task { await refresh() }
+        }, onDeleteAccount: {
+            Task { await deleteAccount() }
+        })
+    }
+
+    /// Confirms with Apple once more (so the server can cancel Sign in with Apple), deletes
+    /// everything on the server, then signs out here. If anything fails, nothing changes
+    /// and you can try again.
+    private func deleteAccount() async {
+        guard let code = await AppleReauth.authorizationCode() else { return }
+        do {
+            guard let current = try await Auth.currentSession() else { return }
+            try await PetalService.deleteAccount(current, appleAuthorizationCode: code)
+        } catch {
+            PetalService.log.error("delete account failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        isShowingSettings = false
+        Auth.signOut()
+        await refresh()
     }
 
     // MARK: - Steps

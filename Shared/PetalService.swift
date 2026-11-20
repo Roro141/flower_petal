@@ -157,6 +157,19 @@ enum PetalService {
 
     // MARK: - Helpers
 
+    /// Deletes my account and everything in it (name, memberships, petals, widget tokens),
+    /// via the `delete-account` Edge Function. `appleAuthorizationCode` comes from a fresh
+    /// Sign in with Apple, so the function can also cancel the app's Sign in with Apple link.
+    static func deleteAccount(_ session: Session, appleAuthorizationCode: String?) async throws {
+        var request = URLRequest(url: projectURL.appending(path: "functions/v1/delete-account"))
+        request.httpMethod = "POST"
+        request.setValue(publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["authorization_code": appleAuthorizationCode])
+        try await sendIgnoringBody(request)
+    }
+
     private static func makeRequest(path: String, query: String? = nil, session: Session) -> URLRequest {
         var components = URLComponents(url: projectURL.appending(path: "rest/v1/\(path)"), resolvingAgainstBaseURL: false)
         components?.query = query

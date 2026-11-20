@@ -123,9 +123,14 @@ private struct WindowBackdrop: View {
     let boardHeight: CGFloat
     /// 0 = curtains hanging still, 1 = blown in by a gust.
     var billow: CGFloat = 0
+    // Your window's colours, from settings.
+    @AppStorage(WindowLook.frameKey, store: WindowLook.store) private var frame: FrameColour = .natural
+    @AppStorage(WindowLook.wallKey, store: WindowLook.store) private var wall: WallColour = .cream
+    @AppStorage(WindowLook.fabricKey, store: WindowLook.store) private var fabric: FabricColour = .cream
 
     var body: some View {
-        Canvas { context, size in
+        let frameColour = frame.colour, wallColour = wall.colour, fabricColour = fabric.colour
+        return Canvas { context, size in
             // A fixed seed: the same small misalignments on every render and device.
             var random = SeededRandom(seed: 21)
             // Edge wobble gets its own numbers, so it never moves the pieces themselves.
@@ -154,21 +159,21 @@ private struct WindowBackdrop: View {
             let window = CGRect(x: width * 0.08, y: height * 0.07,
                                 width: width * 0.84, height: boardTop - height * 0.07)
 
-            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.wall))
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(wallColour))
 
             // Sky, then the frame on top of it. The strips are cut separately and
             // laid down slightly off, the way real paper strips would be.
             piece(cut(window), .sky, lift: 0.4)
             piece(cut(CGRect(x: window.midX - strip * 0.4 + jitter(2), y: window.minY,
-                             width: strip * 0.8, height: window.height)), .wood, lift: 0.6)
+                             width: strip * 0.8, height: window.height)), frameColour, lift: 0.6)
             piece(cut(CGRect(x: window.minX, y: window.minY + window.height * 0.42 + jitter(2),
-                             width: window.width, height: strip * 0.8)), .wood, lift: 0.6)
+                             width: window.width, height: strip * 0.8)), frameColour, lift: 0.6)
             piece(cut(CGRect(x: window.minX - strip * 0.6, y: window.minY - strip * 0.3,
-                             width: strip, height: window.height + strip * 0.3)), .wood)
+                             width: strip, height: window.height + strip * 0.3)), frameColour)
             piece(cut(CGRect(x: window.maxX - strip * 0.4, y: window.minY - strip * 0.3,
-                             width: strip, height: window.height + strip * 0.3)), .wood)
+                             width: strip, height: window.height + strip * 0.3)), frameColour)
             piece(cut(CGRect(x: window.minX - strip, y: window.minY - strip * 0.7,
-                             width: window.width + strip * 2, height: strip)), .wood)
+                             width: window.width + strip * 2, height: strip)), frameColour)
 
             // Curtains: the left one hangs longer than the right.
             // In a small window (the small widget) they're tied back narrower and shorter,
@@ -181,11 +186,11 @@ private struct WindowBackdrop: View {
             piece(RoughEdge.path(through: curtain(x: window.minX - strip * 0.8, top: top, width: leftWidth,
                                                   length: leftLength, flaresLeft: true, billow: billow),
                                  random: &edges),
-                  .cream, lift: 1.4)
+                  fabricColour, lift: 1.4)
             piece(RoughEdge.path(through: curtain(x: window.maxX + strip * 0.8 - rightWidth, top: top,
                                                   width: rightWidth, length: rightLength,
                                                   flaresLeft: false, billow: billow), random: &edges),
-                  .cream, lift: 1.4)
+                  fabricColour, lift: 1.4)
             for line in curtainFolds(x: window.minX - strip * 0.8, top: top, width: leftWidth, length: leftLength) +
                         curtainFolds(x: window.maxX + strip * 0.8 - rightWidth, top: top,
                                      width: rightWidth, length: rightLength) {

@@ -94,7 +94,7 @@ struct WindowsillWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             WindowsillWidgetEntryView(entry: entry)
-                .containerBackground(Color.wall, for: .widget)
+                .containerBackground(for: .widget) { WallFill() }
         }
         // The window runs to the widget's edges.
         .contentMarginsDisabled()
